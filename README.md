@@ -4,8 +4,9 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 0 — repository foundation. Web and API bootstraps run independently.
-Race data and product features are not implemented yet.
+Phase 1 — backend domain foundation. Web and API run independently.
+PostgreSQL models, validation schemas, and an initial migration are available.
+Provider integration and race-data ingestion are not implemented yet.
 
 ## Planned V1
 
@@ -71,9 +72,25 @@ apps/api/.venv/Scripts/python.exe -m pip install -e "apps/api[dev]"
 apps/api/.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir apps/api --reload --port 8000
 ```
 
-Open http://localhost:8000 for the bootstrap response, or
-http://localhost:8000/docs for OpenAPI documentation. No environment file,
-database, cache, or web process is required for this bootstrap.
+Open http://localhost:8000 for the bootstrap response,
+http://localhost:8000/v1/health for process liveness, or
+http://localhost:8000/docs for OpenAPI documentation. Liveness does not check
+database readiness; it requires no environment file, database, cache, or web process.
+
+For database operations, provision an empty PostgreSQL database and configure
+`DATABASE_URL` in `apps/api/.env` (or your shell environment). Copy the template,
+replace its database placeholders, then apply the initial migration:
+
+```powershell
+Copy-Item .env.example apps/api/.env
+# Edit apps/api/.env with your PostgreSQL connection details before continuing.
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+```
+
+Do not overwrite an existing local environment file. The API loads its `.env`
+from `apps/api` regardless of the current working directory. Migrations run
+explicitly; application startup never creates tables or applies migrations.
+See [backend notes](apps/api/README.md) for the domain contracts and focused checks.
 
 On macOS/Linux, replace `apps/api/.venv/Scripts/python.exe` with
 `apps/api/.venv/bin/python` and use `cp` instead of `Copy-Item`.
@@ -95,8 +112,9 @@ are excluded. Python formatting uses Ruff. Shared TypeScript settings live in
 
 The workspace packages `@f1/shared` and `@f1/ui` are reserved directories with
 no runtime exports yet. `infra`, `scripts`, and `docs` contain scope/setup notes.
-Phase 1 will add backend configuration, persistence, migrations, and domain
-entities. Phase 0 adds no ingestion, telemetry, AI, authentication, or 3D.
+The backend now includes configuration, database sessions, nine domain models,
+Pydantic create/read schemas, and Alembic. There is no provider integration,
+ingestion, telemetry, AI, authentication, or 3D implementation.
 
 ## Disclaimer
 

@@ -1,8 +1,11 @@
-"""Phase 0 bootstrap; domain routes belong to later phases."""
+"""Application entry point; migrations run separately from API startup."""
 
 from fastapi import FastAPI
 
+from app.api.router import router
+
 app = FastAPI(title="F1 Intelligence Platform API", version="0.0.0")
+app.include_router(router)
 
 
 @app.get("/")
