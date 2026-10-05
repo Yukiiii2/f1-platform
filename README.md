@@ -4,9 +4,9 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 1 — backend domain foundation. Web and API run independently.
-PostgreSQL models, validation schemas, and an initial migration are available.
-Provider integration and race-data ingestion are not implemented yet.
+Phase 2 — provider integration and core ingestion. Web and API run independently.
+Jolpica core data can be imported into PostgreSQL through an explicit local job.
+The API serves persisted domain data; the web remains the Phase 0 foundation page.
 
 ## Planned V1
 
@@ -79,7 +79,7 @@ database readiness; it requires no environment file, database, cache, or web pro
 
 For database operations, provision an empty PostgreSQL database and configure
 `DATABASE_URL` in `apps/api/.env` (or your shell environment). Copy the template,
-replace its database placeholders, then apply the initial migration:
+replace its database placeholders, then apply the migrations:
 
 ```powershell
 Copy-Item .env.example apps/api/.env
@@ -91,6 +91,21 @@ Do not overwrite an existing local environment file. The API loads its `.env`
 from `apps/api` regardless of the current working directory. Migrations run
 explicitly; application startup never creates tables or applies migrations.
 See [backend notes](apps/api/README.md) for the domain contracts and focused checks.
+
+### Core data import
+
+After installing the updated API dependencies and applying migrations, run a
+season import (or use `--round 1` to limit it to one event):
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m app.ingestion --season 2025
+```
+
+This job calls Jolpica, validates and normalizes its core data, and commits it
+atomically. Repeated imports preserve domain IDs and update existing records.
+Import attempts and failures are recorded in `import_runs`. Imports are explicit;
+no scheduler or live timing is implemented. See [ingestion details](apps/api/README.md#core-data-imports)
+for source fields, retries, limitations, and the read API routes.
 
 On macOS/Linux, replace `apps/api/.venv/Scripts/python.exe` with
 `apps/api/.venv/bin/python` and use `cp` instead of `Copy-Item`.
@@ -112,9 +127,9 @@ are excluded. Python formatting uses Ruff. Shared TypeScript settings live in
 
 The workspace packages `@f1/shared` and `@f1/ui` are reserved directories with
 no runtime exports yet. `infra`, `scripts`, and `docs` contain scope/setup notes.
-The backend now includes configuration, database sessions, nine domain models,
-Pydantic create/read schemas, and Alembic. There is no provider integration,
-ingestion, telemetry, AI, authentication, or 3D implementation.
+The backend includes the nine core domain models, Pydantic schemas, Alembic,
+provider identity mappings, import metadata, core ingestion, and read APIs.
+There is no telemetry, AI, authentication, 3D, or Phase 3 frontend implementation.
 
 ## Disclaimer
 

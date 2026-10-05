@@ -10,6 +10,7 @@ from app.models.domain import (
     Session,
     Team,
 )
+from app.models.imports import ImportRun, ProviderIdentity
 
 __all__ = [
     "Base",
@@ -22,4 +23,6 @@ __all__ = [
     "Season",
     "Session",
     "Team",
+    "ImportRun",
+    "ProviderIdentity",
 ]

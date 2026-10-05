@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -48,6 +48,7 @@ class Event(Entity, Base):
     round: Mapped[int]
     name: Mapped[str] = mapped_column(String(200))
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scheduled_date: Mapped[date | None]
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -80,6 +81,7 @@ class Session(Entity, Base):
     )
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scheduled_date: Mapped[date | None]
 
 
 class Driver(Entity, Base):
@@ -145,7 +147,7 @@ class DriverStanding(Entity, Base):
     season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), index=True)
     event_id: Mapped[UUID] = mapped_column(index=True)
     driver_id: Mapped[UUID] = mapped_column(ForeignKey("drivers.id"), index=True)
-    position: Mapped[int]
+    position: Mapped[int | None]
     points: Mapped[Decimal] = mapped_column(Numeric(10, 3))
     wins: Mapped[int]
 
@@ -169,6 +171,6 @@ class ConstructorStanding(Entity, Base):
     season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), index=True)
     event_id: Mapped[UUID] = mapped_column(index=True)
     team_id: Mapped[UUID] = mapped_column(ForeignKey("teams.id"), index=True)
-    position: Mapped[int]
+    position: Mapped[int | None]
     points: Mapped[Decimal] = mapped_column(Numeric(10, 3))
     wins: Mapped[int]

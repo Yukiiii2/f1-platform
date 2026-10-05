@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from typing import Annotated, Self
 from uuid import UUID
@@ -32,6 +33,7 @@ class ReadFields(Schema):
 
 
 class TimeWindow(Schema):
+    scheduled_date: date | None = None
     starts_at: AwareDatetime | None = None
     ends_at: AwareDatetime | None = None
 
@@ -135,7 +137,7 @@ class ResultRead(ResultCreate, ReadFields):
 class StandingFields(Schema):
     season_id: UUID
     event_id: UUID
-    position: int = Field(gt=0)
+    position: Annotated[int, Field(gt=0)] | None = None
     points: Points
     wins: int = Field(ge=0)
 
