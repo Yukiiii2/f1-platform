@@ -8,11 +8,23 @@ from sqlalchemy import select
 from app import models
 from app.api.core import Database, Limit, Offset, require
 from app.schemas import telemetry as schemas
+from app.schemas.comparison import CompareRequest, CompareResponse
+from app.services.comparison import ComparisonError, LapNotFound, compare_laps
 from app.services.telemetry import session_records
 from app.telemetry.tyres import tyre_age
 
 router = APIRouter(tags=["telemetry"])
 Provider = Annotated[str, Query(min_length=1, max_length=50)]
+
+
+@router.post("/telemetry/compare", response_model=CompareResponse)
+def compare(db: Database, request: CompareRequest):
+    try:
+        return compare_laps(db, request)
+    except LapNotFound as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ComparisonError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.get("/sessions/{session_id}/laps", response_model=list[schemas.LapRead])

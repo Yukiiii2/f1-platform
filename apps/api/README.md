@@ -7,6 +7,7 @@ Phase 2 adds the Jolpica adapter, explicit core imports, provider identity mappi
 import metadata, read APIs, date-only schedule fields, and nullable standings ranks.
 Phase 4 adds normalized session-data storage, historical OpenF1 imports, telemetry
 read APIs, an immutable source-revision ledger, and deterministic tyre age.
+Phase 5 adds a read-only lap-comparison service using these persisted records.
 
 ## Configuration and database lifecycle
 
@@ -298,7 +299,8 @@ session/driver/time with **null `lap_id`**, and laps expose
 `start_time_is_approximate=true`. Session telemetry reads return the traces;
 lap-specific telemetry reads return only confidently associated samples, so they
 are empty for this adapter. No timestamp-window guess or distance interpolation is
-stored. Lap association and comparison require a later, explicit alignment policy.
+stored. Permanent lap association remains unresolved; Phase 5 can select explicitly
+requested approximate windows for comparison without changing sample associations.
 
 ### Session-data read APIs and tyre age
 
@@ -340,4 +342,119 @@ apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test
 Checks use temporary SQLite, mocked HTTP transport and PostgreSQL SQL generation.
 They cover import identity, source revisions, transactions/retries, units/nulls,
 API reads, lap scope integrity, migrations and tyre-age boundaries.
-No lap-comparison service, Telemetry Lab, scheduler, AI or replay is added.
+Phase 4 adds no comparison service, Telemetry Lab, scheduler, AI or replay.
+
+## Lap comparison (Phase 5)
+
+`POST /v1/telemetry/compare` compares two distinct application lap UUIDs from the
+same session. It reads existing lap, telemetry and stint rows; it performs no
+provider requests, ingestion, database writes or persistent sample reassignment.
+No new dependencies, migration, UI, strategy feature, AI or replay are required.
+
+```powershell
+# Replace placeholders with two imported lap UUIDs from the same session.
+$comparison = @{
+  lap_a_id = '<application-lap-a-uuid>'
+  lap_b_id = '<application-lap-b-uuid>'
+  sample_count = 201
+  alignment = 'normalized_distance'
+  allow_approximate = $false
+} | ConvertTo-Json
+Invoke-RestMethod 'http://localhost:8000/v1/telemetry/compare' -Method Post -ContentType 'application/json' -Body $comparison
+```
+
+Request options:
+
+- `sample_count`: 2–2001, default 201, including both grid endpoints.
+- `alignment`: `normalized_distance` (default) or `elapsed_time`.
+- `allow_approximate`: false by default. Set true explicitly for OpenF1 traces:
+  Phase 4 stores null sample lap IDs and approximate lap starts.
+
+The response includes both normalized lap summaries, source stint/compound context,
+derived tyre ages, lap/sector deltas in milliseconds, synchronized channels, a
+delta trace when supported, and method/availability/provenance metadata. Decimal
+values serialize as strings, consistent with the existing API. Missing laps return 404. Invalid UUIDs, repeated lap IDs, different sessions, unknown fields, invalid
+sample counts, or more than 50,000 eligible source samples per lap return 422.
+Missing timing or telemetry returns a comparison with explicit unavailable values,
+rather than fabricated measurements. Nonpositive timing values remain in the source
+summary but do not participate in timing deltas or trace construction.
+
+### Sample association and data classification
+
+By default, comparison uses only samples already linked to each lap, scoped to its
+session, driver and provider. An approximate start is also excluded unless the
+caller opts in. When opted in, the service reads unassigned samples in the source
+start/duration window, including up to one second of boundary context for
+interpolation. Samples explicitly assigned to another lap remain excluded.
+Eligible confirmed samples can be included in the same read. No `lap_id` is changed.
+
+If either selected set uses approximate starts or unassigned samples, the trace is
+classified as **estimate**, with `approximate_window` association metadata and a
+warning. Otherwise, transformed traces are **derived**, never raw measurements.
+Raw lap/sector times and source tyre metadata remain separate in the lap summaries.
+Missing start/duration or no eligible samples leaves trace data unavailable; lap
+and sector deltas remain usable independently when their own timing inputs exist.
+
+### Alignment, interpolation and missing samples
+
+`lap-comparison-v1` uses these rules:
+
+1. For normalized distance, convert speed km/h to m/s and trapezoidally integrate
+   it over elapsed lap time. The whole interval must have nonnull speed coverage,
+   including both boundaries, without source-row gaps longer than one second.
+   No distance is accumulated through missing data.
+2. Normalize each lap's integrated distance independently to 0–1 and resample at
+   `sample_count` equally spaced fractions. Invert each cumulative-distance curve
+   with linear interpolation between knots to obtain elapsed times. Interior
+   stationary plateaus use first arrival; fractions 0 and 1 retain source lap
+   start/finish boundaries. This is derived distance, **not authoritative track
+   position or GPS**, and independent distance normalization can stretch differences
+   caused by measurement error or different racing lines.
+3. If either speed curve is incomplete or has zero total distance, fall back to a
+   common elapsed-time grid spanning the longer lap and report a warning. An
+   explicit `elapsed_time` request uses this method directly. A shorter lap has
+   null channel values after its finish. Elapsed-time alignment returns **no delta
+   trace**: equal elapsed time does not establish equal track position.
+4. Speed, throttle and RPM use linear interpolation between adjacent source rows.
+   Brake state, gear and numeric DRS state hold the previous sample; they are never
+   averaged into fictional states. Unknown DRS codes retain their original meaning
+   as codes rather than being converted to guessed on/off states.
+5. Do not extrapolate before the first sample or after the last. Do not bridge
+   source-row gaps over one second. Explicit null continuous channels make
+   interpolation unavailable across that interval; exact sampled nulls stay null.
+   Discrete nulls remain unknown until a subsequent known sample. No missing sector
+   time is inferred by subtracting other sectors from lap time.
+
+The trace reports actual/requested alignment, axis, resolution, interpolation
+methods, the gap threshold, eligible source counts, integrated distances where
+available, warnings, and `available`/`partial`/`unavailable` channel-grid status.
+Continuous resampling is reported to six decimal places. Distance-to-time inversion
+uses microsecond precision; raw timestamp and channel values remain unchanged.
+
+### Delta convention and tyre context
+
+All timing deltas use `A - B` in milliseconds. A positive lap/sector delta means A
+took longer; a negative one means A was faster. For distance-aligned points:
+`delta_ms = (A_elapsed_seconds - B_elapsed_seconds) * 1000` at the same normalized
+integrated-distance fraction. That reference is explicit and is not an official
+position-gap measurement. Missing/nonpositive timing inputs produce null deltas.
+
+Tyre context uses one unambiguous stint from the same session/driver/provider with
+source start/end laps containing the selected lap. Missing/unknown boundaries or
+overlaps return unavailable/ambiguous context; no compound or fresh tyre set is
+guessed. Unknown `tyre_age_at_start` keeps total ages null while usage remains
+calculable for a known stint. Reusing `completed-laps-v1`, a lap numbered `N` reports
+age before it using completed lap `N - 1`, and after it using completed lap `N`.
+For a set starting at lap 4 with source age 3, lap 10 has usage 6/7 and total age
+9/10 before/after. The source stint is not modified.
+
+### Focused comparison checks
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_phase5.py -v
+```
+
+Tests use temporary storage and hand-calculated timings, speed integrals and tyre
+ages. They verify endpoint validation, delta signs, variable speed, stationary
+samples, channel interpolation, gaps, provider scope, missing data, approximate
+selection and preservation of raw source revisions and sample associations.

@@ -4,14 +4,14 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 4 — telemetry storage and ingestion, alongside the Phase 3 core frontend.
+Phase 5 — backend lap comparison, alongside Phase 4 storage and the Phase 3 frontend.
 Web and API run independently.
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, and Standings.
 All race data comes from the application's persisted domain APIs.
 Historical OpenF1 session data can be imported explicitly into normalized storage.
-Telemetry read APIs and deterministic tyre-age calculations are available; the
-Telemetry Lab UI remains planned.
+Telemetry read APIs, deterministic tyre-age calculations, and backend lap
+comparison are available. The Telemetry Lab UI remains planned.
 
 ## Planned V1
 
@@ -141,6 +141,8 @@ apps/api/.venv/Scripts/python.exe -m app.ingestion.telemetry --session <applicat
 Repeat `--driver` for additional drivers. See
 [session import instructions](apps/api/README.md#telemetry-data-imports-phase-4)
 for finding identifiers, read routes, source coverage, and lap-association limits.
+See [lap comparison](apps/api/README.md#lap-comparison-phase-5) for
+`POST /v1/telemetry/compare`, alignment rules, and approximate-data opt-in.
 
 ### Formatting and lint baseline
 
@@ -163,7 +165,8 @@ The backend includes the nine core domain models, Pydantic schemas, Alembic,
 provider identity mappings, import metadata, core ingestion, and read APIs.
 The core frontend consumes the core read APIs. The backend also stores supported
 lap, telemetry, stint, pit, position, interval, race-control, and weather data.
-Telemetry comparison and UI, AI, authentication, live timing, and 3D remain planned.
+Backend lap comparison reads this persisted data. Telemetry UI, AI, authentication,
+live timing, and 3D remain planned.
 
 ## Disclaimer
 
