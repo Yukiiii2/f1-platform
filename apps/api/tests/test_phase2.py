@@ -171,9 +171,15 @@ class Phase2Tests(unittest.TestCase):
         from alembic.autogenerate import compare_metadata
         from alembic.migration import MigrationContext
         from alembic.operations import Operations
+        from sqlalchemy import MetaData
 
         from app.models import Base
 
+        # This historical revision check covers Phase 1–2 tables only.
+        core_metadata = MetaData()
+        for mapper in Base.registry.mappers:
+            if mapper.class_.__module__ in {"app.models.domain", "app.models.imports"}:
+                mapper.local_table.to_metadata(core_metadata)
         migrations = []
         for filename in ("0001_core_domain.py", "0002_core_ingestion.py"):
             path = Path(__file__).parents[1] / "migrations/versions" / filename
@@ -190,7 +196,7 @@ class Phase2Tests(unittest.TestCase):
                 with Operations.context(context):
                     for migration in migrations:
                         migration.upgrade()
-                self.assertEqual(compare_metadata(context, Base.metadata), [])
+                self.assertEqual(compare_metadata(context, core_metadata), [])
                 with Operations.context(context):
                     migrations[1].downgrade()
                     migrations[0].downgrade()

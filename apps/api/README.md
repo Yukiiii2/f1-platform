@@ -1,10 +1,12 @@
-# Backend foundation and core ingestion
+# Backend foundation, core ingestion and telemetry storage
 
 Phase 1 adds configuration, PostgreSQL sessions, nine core models, Pydantic
 create/read schemas, `/v1/health`, and the initial Alembic revision. Setup and
 startup commands are in the [root README](../../README.md).
 Phase 2 adds the Jolpica adapter, explicit core imports, provider identity mappings,
 import metadata, read APIs, date-only schedule fields, and nullable standings ranks.
+Phase 4 adds normalized session-data storage, historical OpenF1 imports, telemetry
+read APIs, an immutable source-revision ledger, and deterministic tyre age.
 
 ## Configuration and database lifecycle
 
@@ -189,3 +191,153 @@ apps/api/.venv/Scripts/python.exe -m ruff format --check apps/api/app apps/api/m
 The persistence tests run migrations on temporary in-memory SQLite and compile
 PostgreSQL SQL. They do not establish a live PostgreSQL connection or substitute
 SQLite for the application's configured PostgreSQL database.
+
+## Telemetry data imports (Phase 4)
+
+The [OpenF1 adapter](https://openf1.org/docs/) imports historical session data.
+Provider capabilities and free access were checked on 2026-10-06: historical
+coverage begins in 2023, and historical access requires no authentication.
+The [free tier](https://openf1.org/) allows 3 requests/second and 30/minute;
+this adapter spaces requests by at least 2.1 seconds and honors `Retry-After`.
+It retries transport errors, HTTP 429 and server errors at most three times.
+Long waits, other HTTP failures and malformed data fail the import. The provider's
+specific 404 `No results found.` response is an empty optional collection, while
+a missing source session is an error. There is no undocumented pagination scheme:
+documented JSON collections are fetched per selected driver to bound response size.
+
+### Local setup and identifiers
+
+Import the matching Phase 2 core event first, then migrate from the repository root:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+# Example: ensure the 2025 Australian event and core driver catalog are present.
+apps/api/.venv/Scripts/python.exe -m app.ingestion --season 2025 --round 1
+$events = Invoke-RestMethod 'http://localhost:8000/v1/events?season=2025&limit=200'
+$eventId = ($events | Where-Object round -eq 1).id
+Invoke-RestMethod "http://localhost:8000/v1/events/$eventId/sessions"
+Invoke-RestMethod 'http://localhost:8000/v1/drivers?limit=200'
+# Read-only source discovery: inspect its session_key, dates, type and country.
+Invoke-RestMethod 'https://api.openf1.org/v1/sessions?year=2025&country_name=Australia&session_name=Race'
+Invoke-RestMethod 'https://api.openf1.org/v1/drivers?session_key=<openf1-session-key>'
+```
+
+Copy the application's matching session UUID and selected driver UUIDs from these
+responses. Use OpenF1's **session car number**, not the driver's permanent number.
+Import one or more explicitly mapped drivers:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m app.ingestion.telemetry --session <application-session-uuid> --source-session <openf1-session-key> --driver "<car-number>=<application-driver-uuid>"
+# Repeat --driver "<another-number>=<another-driver-uuid>" to extend the scope.
+Invoke-RestMethod 'http://localhost:8000/v1/sessions/<application-session-uuid>/laps?limit=200'
+Invoke-RestMethod 'http://localhost:8000/v1/sessions/<application-session-uuid>/telemetry?driver_id=<application-driver-uuid>&limit=200'
+```
+
+Angle-bracket values are placeholders to replace. A full-session import can be
+large; start with the drivers you need. Source sessions must have ended more than
+30 minutes ago, outside OpenF1's live-access window. Session year/type, country and
+scheduled date must match the existing domain session. Explicit driver mappings
+are checked against available source/domain driver codes. Identity conflicts fail
+rather than reassigning an existing mapping. Mappings are session-scoped so a car
+number can represent a different driver in another session. Core models and
+Jolpica identities are unchanged; OpenF1 session mappings reuse `provider_identities`.
+
+### Persistence, provenance and source fields
+
+`Lap`, `TelemetrySample`, `Stint`, `PitStop`, `PositionSample`, `IntervalSample`,
+`RaceControlMessage` and `WeatherSample` reference existing session/driver UUIDs.
+Provider/key uniqueness and natural constraints prevent duplicate samples on
+retry. All timestamps use timezone-aware schemas and PostgreSQL timestamps;
+source timestamp precision is retained. A composite lap foreign key prevents
+associating a sample with another session, driver or provider.
+
+Imports create an `import_runs` record linked to the domain season/session before
+source IO. Requested driver numbers are included in its external scope identifier.
+The normalized data, identity mappings, source revisions and success state commit
+atomically under a PostgreSQL provider advisory lock. Serialization, deadlock and
+unique conflicts retry the transaction at most three times using the fetched bundle.
+Failures roll back data writes and record sanitized failure metadata separately.
+An empty collection does not delete earlier data or certify source completeness.
+Zero counts in `row_counts` identify collections absent from the selected import.
+
+Raw record payloads are retained separately in `telemetry_source_records`, keyed
+by provider, session, kind, source key and content checksum. Reimports reuse
+identical revisions; corrected source values append revisions and update the
+normalized row while preserving its UUID. Source rows are never updated by this
+pipeline. `fetched_at` records retrieval, not an authoritative source-update time;
+the latter remains null. Raw provider payloads and keys are excluded from read APIs.
+
+Normalized source fields:
+
+- Laps: number, approximate source start, duration and three sector durations in
+  decimal seconds, pit-out state; unavailable values remain null.
+- Telemetry: source timestamp, speed in km/h, throttle percentage, brake applied
+  boolean, gear (including neutral 0), RPM and numeric DRS state. Brake 0/100 becomes
+  off/on; its original numeric value remains in the raw ledger. DRS state is retained
+  without guessing ambiguous codes. No pressure is derived from brake state.
+- Stints: number, compound, first/last lap and supplied tyre age at stint start.
+- Pits: lap, timestamp, pit-lane duration and stationary stop duration separately.
+  Deprecated `pit_duration` supplies lane duration only when the new value is absent.
+  Missing stationary duration remains null, never replaced by pit-lane time.
+- Positions: race/session classification position, not GPS coordinates.
+- Intervals: decimal seconds or separately tagged lap counts for interval/gap.
+  Null leader values stay null; lap gaps are never converted into time gaps.
+- Race control: timestamp, message, category, flag, scope and available driver,
+  lap, sector and qualifying-phase context. Messages for unmapped drivers are
+  outside the selected scope; general messages are included.
+- Weather: timestamp, air/track temperature in °C, humidity %, pressure mbar,
+  rainfall state, wind direction degrees and wind speed m/s.
+
+Microsector colors and speed-trap fields remain only in raw lap payloads.
+Location, radio, overtakes, source standings and result endpoints are not imported.
+There are no tyre temperatures/pressures, fuel loads, brake pressures or other
+unsupported engineering channels in the application contracts.
+
+OpenF1 documents lap-start times as approximate. Samples therefore retain
+session/driver/time with **null `lap_id`**, and laps expose
+`start_time_is_approximate=true`. Session telemetry reads return the traces;
+lap-specific telemetry reads return only confidently associated samples, so they
+are empty for this adapter. No timestamp-window guess or distance interpolation is
+stored. Lap association and comparison require a later, explicit alignment policy.
+
+### Session-data read APIs and tyre age
+
+All collection routes use the existing array, `limit` (1–200, default 50), `offset`,
+404/empty/503 conventions. IDs are application UUIDs; `provider` supplies provenance.
+Collections accept a provider filter, and driver collections accept `driver_id`.
+
+- `GET /v1/sessions/{session_id}/laps`
+- `GET /v1/laps/{lap_id}` and `/v1/laps/{lap_id}/telemetry`
+- `GET /v1/sessions/{session_id}/telemetry`
+- `GET /v1/sessions/{session_id}/stints`
+- `GET /v1/sessions/{session_id}/pits`
+- `GET /v1/sessions/{session_id}/positions`
+- `GET /v1/sessions/{session_id}/intervals`
+- `GET /v1/sessions/{session_id}/race-control`
+- `GET /v1/sessions/{session_id}/weather`
+- `GET /v1/stints/{stint_id}/tyre-age?completed_lap=13`
+
+Session telemetry accepts aware `from_time` (inclusive) and `to_time` (exclusive).
+It never calls upstream during a request. Decimal measurements serialize as strings,
+consistent with existing domain decimal contracts.
+
+Tyre age is separate **derived** data, formula version `completed-laps-v1`:
+`usage = min(completed_lap, lap_end) - lap_start + 1`, omitting the minimum if
+the source end lap is unavailable; `total_age = tyre_age_at_start + usage`.
+`lap_start` is the first lap driven on the set: after `lap_start - 1`, usage is 0;
+after `lap_start`, it is 1. Requests past a known end return the set's final age.
+Missing starting tyre age yields null total age, never an assumed fresh set.
+Missing start lap or requests before fitting return 422. The caller supplies the
+completed-lap boundary; the calculation does not certify that the lap was completed.
+Source stint rows remain unchanged.
+
+### Focused Phase 4 checks
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_phase4.py -v
+```
+
+Checks use temporary SQLite, mocked HTTP transport and PostgreSQL SQL generation.
+They cover import identity, source revisions, transactions/retries, units/nulls,
+API reads, lap scope integrity, migrations and tyre-age boundaries.
+No lap-comparison service, Telemetry Lab, scheduler, AI or replay is added.

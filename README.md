@@ -4,11 +4,14 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 3 — core frontend, backed by Phase 2 ingestion and read APIs.
+Phase 4 — telemetry storage and ingestion, alongside the Phase 3 core frontend.
 Web and API run independently.
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, and Standings.
 All race data comes from the application's persisted domain APIs.
+Historical OpenF1 session data can be imported explicitly into normalized storage.
+Telemetry read APIs and deterministic tyre-age calculations are available; the
+Telemetry Lab UI remains planned.
 
 ## Planned V1
 
@@ -124,6 +127,21 @@ for source fields, retries, limitations, and the read API routes.
 On macOS/Linux, replace `apps/api/.venv/Scripts/python.exe` with
 `apps/api/.venv/bin/python` and use `cp` instead of `Copy-Item`.
 
+### Historical session data import
+
+Apply the new migration, then import a historical OpenF1 session into an existing
+application session. Map each selected session car number explicitly to an
+existing application driver UUID:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+apps/api/.venv/Scripts/python.exe -m app.ingestion.telemetry --session <application-session-uuid> --source-session <openf1-session-key> --driver "<car-number>=<application-driver-uuid>"
+```
+
+Repeat `--driver` for additional drivers. See
+[session import instructions](apps/api/README.md#telemetry-data-imports-phase-4)
+for finding identifiers, read routes, source coverage, and lap-association limits.
+
 ### Formatting and lint baseline
 
 Run only the checks relevant to your changes:
@@ -143,8 +161,9 @@ The workspace packages `@f1/shared` and `@f1/ui` are reserved directories with
 no runtime exports yet. `infra`, `scripts`, and `docs` contain scope/setup notes.
 The backend includes the nine core domain models, Pydantic schemas, Alembic,
 provider identity mappings, import metadata, core ingestion, and read APIs.
-The core frontend consumes these read APIs. Telemetry, AI, authentication, live
-timing, and 3D remain outside the implemented scope.
+The core frontend consumes the core read APIs. The backend also stores supported
+lap, telemetry, stint, pit, position, interval, race-control, and weather data.
+Telemetry comparison and UI, AI, authentication, live timing, and 3D remain planned.
 
 ## Disclaimer
 

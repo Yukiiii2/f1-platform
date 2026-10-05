@@ -11,6 +11,18 @@ from app.models.domain import (
     Team,
 )
 from app.models.imports import ImportRun, ProviderIdentity
+from app.models.telemetry import (
+    IntervalSample,
+    Lap,
+    PitStop,
+    PositionSample,
+    RaceControlMessage,
+    SessionDriverIdentity,
+    Stint,
+    TelemetrySample,
+    TelemetrySourceRecord,
+    WeatherSample,
+)
 
 __all__ = [
     "Base",
@@ -25,4 +37,14 @@ __all__ = [
     "Team",
     "ImportRun",
     "ProviderIdentity",
+    "IntervalSample",
+    "Lap",
+    "PitStop",
+    "PositionSample",
+    "RaceControlMessage",
+    "SessionDriverIdentity",
+    "Stint",
+    "TelemetrySample",
+    "TelemetrySourceRecord",
+    "WeatherSample",
 ]
