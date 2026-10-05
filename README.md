@@ -4,9 +4,11 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 2 — provider integration and core ingestion. Web and API run independently.
+Phase 3 — core frontend, backed by Phase 2 ingestion and read APIs.
+Web and API run independently.
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
-The API serves persisted domain data; the web remains the Phase 0 foundation page.
+The web provides Home, Races, Race detail, Drivers, Driver detail, and Standings.
+All race data comes from the application's persisted domain APIs.
 
 ## Planned V1
 
@@ -59,10 +61,22 @@ Copy-Item .env.example apps/web/.env.local
 npm run dev:web
 ```
 
-Open http://localhost:3000. The web runs without the API or a database.
-`NEXT_PUBLIC_API_URL` reserves the application API address for future integration;
-the Phase 0 page does not fetch data. Remove the unused database/cache placeholders
-from `apps/web/.env.local`; never prefix secrets with `NEXT_PUBLIC_`.
+Open http://localhost:3000. The application shell runs independently; data pages
+need the API, a migrated PostgreSQL database, and imported core records.
+`NEXT_PUBLIC_API_URL` is the application API base address (without `/v1`), defaulting
+to `http://localhost:8000`. Next.js fetches this API on the server, so the address
+must be reachable from the web server; browser CORS configuration is not needed.
+Remove the unused database/cache placeholders from `apps/web/.env.local`; never
+prefix secrets with `NEXT_PUBLIC_`. Do not overwrite an existing environment file.
+
+The frontend supports imported season selection, driver search, session selection,
+and driver/constructor standings. A driver profile shows championship data and
+results for a selected weekend; constructor identity comes from each session result.
+Schedules display UTC, date-only schedules do not invent times, and statuses come
+from recorded session data. Unimported data has explicit empty states; connection
+failures have a retry action. No demonstration race statistics are shipped.
+
+See [frontend notes](apps/web/README.md) for routes and focused validation.
 
 ### API (separate terminal)
 
@@ -129,7 +143,8 @@ The workspace packages `@f1/shared` and `@f1/ui` are reserved directories with
 no runtime exports yet. `infra`, `scripts`, and `docs` contain scope/setup notes.
 The backend includes the nine core domain models, Pydantic schemas, Alembic,
 provider identity mappings, import metadata, core ingestion, and read APIs.
-There is no telemetry, AI, authentication, 3D, or Phase 3 frontend implementation.
+The core frontend consumes these read APIs. Telemetry, AI, authentication, live
+timing, and 3D remain outside the implemented scope.
 
 ## Disclaimer
 
