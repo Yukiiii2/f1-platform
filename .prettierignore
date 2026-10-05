@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.venv/
+__pycache__/
+*.tsbuildinfo
+package-lock.json
+# Existing project specifications are preserved as supplied.
+/AGENTS.md
+/AI.md
+/ARCHITECTURE.md
+/CODEX_PROMPTS.md
+/CODEX_USAGE.md
+/DATA_AND_TELEMETRY.md
+/DESIGN.md
+/DESIGN_GUIDELINES.md
+/PRODUCT.md
+/ROADMAP.md

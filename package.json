@@ -1,0 +1,22 @@
+{
+  "name": "f1-platform",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev:web": "npm run dev --workspace @f1/web",
+    "lint:web": "npm run lint --workspace @f1/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.6.0"
+  }
+}
