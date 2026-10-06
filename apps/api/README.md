@@ -505,23 +505,57 @@ apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test
 ## Pitwall backend (Phase 08)
 
 `POST /v1/ai/query` uses the existing application handlers/services and public DTOs.
-No provider calls, ingestion writes, migrations, reports, frontend AI UI or 3D are
+No F1 provider calls, ingestion writes, migrations, reports, frontend AI UI or 3D are
 added. Configure **only** `apps/api/.env`, retaining the existing database settings:
 
 ```dotenv
-OPENAI_API_KEY=<server-only-key>
-PITWALL_MODEL=<Responses-model-with-function-calling-and-strict-JSON-support>
+GEMINI_API_KEY=<server-only-key>
+PITWALL_PROVIDER=gemini
+PITWALL_MODEL=gemini-3.8-flash
+PITWALL_FALLBACK_MODELS=gemini-3.7-flash,gemini-3.6-flash
+PITWALL_MAX_RETRIES=1
 ```
 
 Blank/unset AI values leave the data APIs operational; queries return 503 until
 configured. Restart the API after changing environment configuration. Never put
 the key in `NEXT_PUBLIC_*`, client code, requests or committed files. Keys are
 masked in settings and upstream failures return fixed public-safe messages.
-The transport uses existing `httpx` and the official
+SDK payload logging is suppressed even when `GOOGLE_GENAI_DEBUG` is enabled.
+Gemini uses the official `google-genai` Python SDK's
+[Interactions function-calling](https://ai.google.dev/gemini-api/docs/function-calling)
+and [structured-output](https://ai.google.dev/gemini-api/docs/structured-output)
+contracts. `gemini-3.8-flash` is listed as stable in Google's current
+[model catalog](https://ai.google.dev/gemini-api/docs/models), with free-tier
+input/output listed in the [pricing documentation](https://ai.google.dev/gemini-api/docs/pricing).
+Free-tier quotas and project availability still apply; free-tier content may be
+used to improve Google's products. Only public application evidence and the
+question/context are sent; no keys go in prompts or tool content.
+
+The provider factory retains OpenAI: set `PITWALL_PROVIDER=openai`,
+`OPENAI_API_KEY` locally, and an appropriate `PITWALL_MODEL`. Blank/unset provider
+preserves the existing OpenAI default. Gemini model fallback stays within Gemini;
+there is no fallback between providers. The optional comma-separated model list
+is tried in order, with duplicates removed and at most three fallback models.
+Google currently lists `gemini-3.7-flash` and `gemini-3.6-flash` as stable models
+with function calling, structured outputs and free-tier input/output.
+
+Gemini retries transient 429/500/502/503/504 and transport failures. One retry per
+model is the default; `PITWALL_MAX_RETRIES` accepts 0-2, with delays of 1s then 2s.
+Retries/fallbacks share a 45-second budget across all model turns in one query;
+request timeouts are capped by the remaining budget. A successful fallback is
+retained for the query. Authentication, malformed requests and identified daily,
+zero or exhausted quotas stop immediately. Unknown 429 rate limits remain bounded.
+If all attempts fail, the existing public-safe 503 response is preserved.
+Logs contain only safe model IDs, status categories, retry counts and decisions;
+provider error bodies, keys and prompts are never logged.
+OpenAI uses existing `httpx` and the official
 [Responses function-calling](https://developers.openai.com/api/docs/guides/function-calling)
 and [structured-output](https://developers.openai.com/api/docs/guides/structured-outputs)
-contracts. Requests set `store=false`; normal API requests transmit the user's
-question/context and retrieved public application data to the configured model.
+contracts. Both providers set `store=false`. Gemini replays the full native model
+steps, including opaque thought signatures, and function results statelessly.
+Thoughts and provider payloads are never exposed in the public answer. Only the
+existing application tool registry executes functions; no SDK automatic function
+execution, built-in search/code tools or implicit SDK retries are enabled.
 
 Example from the repository root with the API running on port 8000:
 
@@ -567,8 +601,9 @@ caveats, not verified causality or confirmed team intent.
 
 Invalid/unreferenced/misclassified answers or exhausted call budgets return 502,
 without a model-memory fallback. Database/model unavailability returns 503. No
-automatic retry or paid model call occurs in focused tests:
+paid model call occurs in tests; retry/fallback behavior uses controlled transport:
 
 ```powershell
 apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_phase8.py -v
+apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_gemini.py -v
 ```

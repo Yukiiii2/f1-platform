@@ -2,13 +2,13 @@
 
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
 
-from app.ai.client import AIUnavailable, ModelClient, OpenAIResponsesClient
+from app.ai.client import AIUnavailable, ModelClient
+from app.ai.providers import configured_client
 from app.ai.service import AnswerError, ContextError, query
 from app.api.core import Database
 from app.core.config import get_settings
@@ -42,15 +42,13 @@ def ai_client():
         raise HTTPException(
             status_code=503, detail="Pitwall configuration is unavailable"
         ) from None
-    key = settings.openai_api_key.get_secret_value() if settings.openai_api_key else ""
-    if (
-        not key.strip()
-        or not settings.pitwall_model
-        or not settings.pitwall_model.strip()
-    ):
-        raise HTTPException(status_code=503, detail="Pitwall is not configured")
-    with httpx.Client(follow_redirects=False) as http:
-        yield OpenAIResponsesClient(key, settings.pitwall_model, http)
+    try:
+        with configured_client(settings) as client:
+            yield client
+    except AIUnavailable:
+        raise HTTPException(
+            status_code=503, detail="Pitwall model configuration/service is unavailable"
+        ) from None
 
 
 Client = Annotated[ModelClient, Depends(ai_client)]
