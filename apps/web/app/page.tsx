@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CarShowcase } from "./_components/car-showcase";
 import type { Circuit, Driver, SearchPageProps, Team } from "./_lib/contracts";
 import {
   constructorStandings,
@@ -126,6 +127,7 @@ export default async function HomePage({ searchParams }: SearchPageProps) {
               <dd>{race ? <Status value={race.status} /> : "Not available"}</dd>
             </div>
           </dl>
+          <CarShowcase />
         </section>
       ) : (
         <>

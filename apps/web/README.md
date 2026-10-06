@@ -38,8 +38,35 @@ The shared shell includes navigation, a skip link, visible focus, semantic table
 scrollable table regions, and responsive layouts. Route loading uses static
 skeletons; failed reads use a retry boundary; missing UUIDs use a not-found page.
 The Telemetry Lab adds stored historical lap comparison. Strategy adds completed-race
-stint comparison. Pitwall adds contextual analysis. No authentication, live updates,
-or 3D is included.
+stint comparison. Pitwall adds contextual analysis. The homepage adds one optional
+illustrative 3D car. No authentication or live updates are included.
+
+## First 3D feature (Phase 10 prompt)
+
+The existing homepage race hero includes an authored open-wheel illustration.
+It is not an actual team car, measured engineering geometry, or a race replay.
+Race data and links continue to use the existing application contracts unchanged.
+
+The static SVG renders without WebGL or JavaScript. `Explore in 3D` lazily loads a
+small native WebGL renderer; no additional packages, provider requests or models are
+needed. A labelled slider provides keyboard rotation, with reset and static-view
+controls. There is no automatic motion or animation loop, including with reduced
+motion enabled. Rendering occurs only on demand or resize; the drawing buffer is capped
+at 600,000 pixels, density at 1.5, and contexts/resources are released on exit.
+Unavailable WebGL, shader failures, failed chunk loading and context loss return to
+the static illustration. Hardware is intentionally allowed to reject the optional
+low-power view. Existing telemetry, strategy and Pitwall pages are unaffected.
+
+`public/illustrations/open-wheel-car.svg` is the static projection of
+`app/_lib/car-geometry.ts` (`carSvg()`). If the authored shape changes, regenerate
+that SVG with the same function. Both are original project illustrations.
+Resource cleanup and pixel caps follow [WebGL best practices](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices).
+
+Focused geometry, fallback, resource-lifecycle and core data checks:
+
+```powershell
+node --test apps/web/tests/car3d.test.mjs apps/web/tests/core.test.mjs
+```
 
 ## Pitwall frontend (Phase 09 prompt)
 
