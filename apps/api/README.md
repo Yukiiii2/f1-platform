@@ -276,6 +276,9 @@ Normalized source fields:
   boolean, gear (including neutral 0), RPM and numeric DRS state. Brake 0/100 becomes
   off/on; its original numeric value remains in the raw ledger. DRS state is retained
   without guessing ambiguous codes. No pressure is derived from brake state.
+  The upstream pedal value 104 indicates unavailable/error data: brake/throttle
+  normalize to null for that value, while immutable source payloads retain 104.
+  Other unsupported brake states and out-of-range throttle values still fail validation.
 - Stints: number, compound, first/last lap and supplied tyre age at stint start.
 - Pits: lap, timestamp, pit-lane duration and stationary stop duration separately.
   Deprecated `pit_duration` supplies lane duration only when the new value is absent.

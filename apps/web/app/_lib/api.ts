@@ -8,6 +8,7 @@ export class ApiError extends Error {
 async function request<T>(
   path: string,
   query: Record<string, string | number> = {},
+  body?: unknown,
 ): Promise<T> {
   try {
     const base = (
@@ -20,6 +21,13 @@ async function request<T>(
     const response = await fetch(url, {
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
+      ...(body === undefined
+        ? {}
+        : {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }),
     });
     if (!response.ok) throw new ApiError(response.status);
     return (await response.json()) as T;
@@ -27,6 +35,9 @@ async function request<T>(
     if (error instanceof ApiError) throw error;
     throw new ApiError();
   }
+}
+export function postEntity<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {}, body);
 }
 export async function getList<T extends { id: string }>(
   path: string,

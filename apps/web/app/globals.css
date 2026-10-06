@@ -79,6 +79,7 @@ button:disabled {
 }
 .primary-nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 2rem;
 }
@@ -592,6 +593,7 @@ tbody th a:hover {
 @media (max-width: 900px) {
   .header-inner {
     gap: 1rem;
+    flex-wrap: wrap;
   }
   .primary-nav {
     gap: 1.3rem;

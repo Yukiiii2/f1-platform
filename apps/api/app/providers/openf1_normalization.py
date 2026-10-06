@@ -59,6 +59,12 @@ def state(value, off, on):
     raise ValueError("Unsupported source state")
 
 
+def pedal(value):
+    # The upstream feed uses 104 for unavailable/error pedal data, not 104%.
+    # Keep it in the source payload; never guess a throttle value or brake state.
+    return None if value == 104 else value
+
+
 def gap(value):
     if value is None:
         return None, None
@@ -134,8 +140,8 @@ def normalize(data, source_session, drivers, fetched_at):
                 if kind == "telemetry":
                     attributes.update(
                         speed_kph=number(row.get("speed")),
-                        throttle_percent=number(row.get("throttle")),
-                        brake_applied=state(row.get("brake"), 0, 100),
+                        throttle_percent=number(pedal(row.get("throttle"))),
+                        brake_applied=state(pedal(row.get("brake")), 0, 100),
                         gear=row.get("n_gear"),
                         rpm=row.get("rpm"),
                         drs_state=row.get("drs"),

@@ -219,6 +219,72 @@ class Phase4Tests(unittest.TestCase):
                 sorted(row.payload["lap_duration"] for row in values), [91.743, 92.001]
             )
 
+    def test_unavailable_pedal_104_is_null_and_raw_revisions_survive_reimports(self):
+        from app.models.telemetry import TelemetrySample, TelemetrySourceRecord
+
+        data = source_data()
+        data["car_data"][0].update(brake=104, throttle=104)
+        original = copy.deepcopy(data)
+        self.import_data(data)
+        self.import_data(data)
+        with self.factory() as db:
+            sample = db.scalar(select(TelemetrySample))
+            sample_id = sample.id
+            self.assertIsNone(sample.brake_applied)
+            self.assertIsNone(sample.throttle_percent)
+            self.assertEqual(sample.speed_kph, 315)
+            raw = db.scalars(
+                select(TelemetrySourceRecord).where(
+                    TelemetrySourceRecord.kind == "telemetry"
+                )
+            ).all()
+            self.assertEqual(len(raw), 1)
+            self.assertEqual(raw[0].payload, original["car_data"][0])
+        self.assertEqual(data, original)
+
+        data["car_data"][0].update(brake=100, throttle=42)
+        self.import_data(data)
+        with self.factory() as db:
+            sample = db.scalar(select(TelemetrySample))
+            self.assertEqual(sample.id, sample_id)
+            self.assertTrue(sample.brake_applied)
+            self.assertEqual(sample.throttle_percent, 42)
+            raw = db.scalars(
+                select(TelemetrySourceRecord).where(
+                    TelemetrySourceRecord.kind == "telemetry"
+                )
+            ).all()
+            self.assertEqual(sorted(row.payload["brake"] for row in raw), [100, 104])
+
+    def test_unavailable_pedal_marker_does_not_hide_known_or_invalid_other_fields(self):
+        from app.providers.base import ProviderError
+
+        for brake, throttle in ((104, 0), (0, 104), (100, 104)):
+            data = source_data()
+            data["car_data"][0].update(brake=brake, throttle=throttle)
+            sample = next(
+                record
+                for record in provider(data).fetch_session(9999, [7]).records
+                if record.kind == "telemetry"
+            )
+            self.assertEqual(
+                sample.attributes["brake_applied"],
+                None if brake == 104 else brake == 100,
+            )
+            self.assertEqual(
+                sample.attributes["throttle_percent"],
+                None if throttle == 104 else throttle,
+            )
+        for throttle in (-1, 101, 105):
+            data = source_data()
+            data["car_data"][0]["throttle"] = throttle
+            with self.assertRaises(ValueError):
+                self.import_data(data)
+        data = source_data()
+        data["weather"][0]["rainfall"] = 104
+        with self.assertRaises(ProviderError):
+            provider(data).fetch_session(9999, [7])
+
     def test_failed_import_is_atomic_and_observable(self):
         from app import models
         from app.models.telemetry import Lap, TelemetrySourceRecord

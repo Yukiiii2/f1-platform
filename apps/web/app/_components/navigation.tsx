@@ -6,6 +6,7 @@ const links = [
   ["/races", "Races"],
   ["/drivers", "Drivers"],
   ["/standings", "Standings"],
+  ["/telemetry", "Telemetry Lab"],
 ] as const;
 export function Navigation() {
   const pathname = usePathname();
