@@ -8,6 +8,77 @@ import metadata, read APIs, date-only schedule fields, and nullable standings ra
 Phase 4 adds normalized session-data storage, historical OpenF1 imports, telemetry
 read APIs, an immutable source-revision ledger, and deterministic tyre age.
 Phase 5 adds a read-only lap-comparison service using these persisted records.
+Phase 11 (prompt numbering) adds an explicit historical post-session worker.
+
+## Automatic post-session updates (Phase 11 prompt)
+
+Run migrations first (`0004_session_updates`). The worker is a separate process,
+never part of FastAPI or its reload processes. Existing core sessions/drivers must
+be imported before registration. Reuse the explicit Phase 4 application UUIDs and
+OpenF1 session/driver mappings; numbers alone are not permanent driver identities.
+
+For the existing 2025 Australian race, after setting `$sessionId`, `$norrisId` and
+`$verstappenId` as in the historical-import example:
+
+```powershell
+$env:PYTHONPATH = "apps/api"
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+apps/api/.venv/Scripts/python.exe -m app.workers --register --session $sessionId --source-session 9693 --driver "4=$norrisId" --driver "1=$verstappenId"
+apps/api/.venv/Scripts/python.exe -m app.workers --once
+apps/api/.venv/Scripts/python.exe -m app.workers --status --session $sessionId
+```
+
+For continuous background checks, run `python -m app.workers --watch` with the same
+repository virtual-environment interpreter and `PYTHONPATH`. Stop with Ctrl+C.
+Default checks are every 1800 seconds; `--poll-seconds` cannot be below 900.
+Far-future sessions defer until the day before their scheduled start. Historical
+sessions missing completion evidence or core publication wait at least six hours
+between checks.
+One PostgreSQL advisory lock prevents overlapping workers and is released on exit
+or connection loss. A restarted worker re-runs interrupted jobs idempotently.
+
+Each registered scope refreshes Jolpica schedule/results/available standing
+snapshots (one import per event per tick). Telemetry finalization requires the
+existing 30-minute historical settling window plus published classification or
+an explicit OpenF1 session-end/track chequered signal. Qualifying chequered signals
+and session-end signals require phase 3, avoiding Q1/Q2 completion guesses;
+absent phase metadata waits for published classification. A later start/resume
+supersedes older terminal signals. Date/time alone never confirms completion.
+Source cancellation metadata/messages stop the job; scope mismatches fail safely.
+Completion signals use the [OpenF1 race-control contract](https://openf1.org/docs/#race-control).
+
+Finalization reuses Phase 2/4 normalization, validation, mappings and atomic
+ingestion for supported results, laps, car data, stints, pits, positions/intervals,
+race control and weather. Raw revisions, approximate lap-window labels, unknown
+channels and tyre-age semantics are unchanged. Missing collections remain empty,
+not invented. Published classification is not a claim of official finality;
+later corrections can be re-imported with an explicit `--retry --session <UUID>`.
+Jolpica-supported race/sprint/qualifying jobs remain pending while classification
+is unavailable; race/sprint jobs also await event standings snapshots. Already
+imported telemetry stays available while polling core publication, without repeated
+full telemetry downloads. Once core data arrives, final ingestion runs again to
+capture late source revisions. Unsupported practice results are never invented.
+
+`session_update_jobs` records stages, attempts, completion evidence, linked import
+runs, row counts and a versioned strategy calculation audit snapshot. Existing
+APIs continue calculating current strategy/comparisons from application data;
+they do not read this snapshot. Cache invalidation receives session/event/season/
+driver scope, but currently records `not_cached`: APIs query the database and
+Next.js uses `cache: no-store`, so no active data cache requires eviction.
+Optional AI report generation is not enabled; interactive Pitwall is unchanged.
+
+Dependency/validation failures back off by the polling interval, then twice that
+interval. Three consecutive failures stop the job. Inspect `--status`, fix the
+cause, then use `--retry --session <UUID>` to reset the failure count. Logs include
+job/stage/count/duration and fixed error categories, never raw exception strings
+or private configuration. No new dependencies or environment variables are needed.
+
+Focused checks:
+
+```powershell
+$env:PYTHONPATH = "apps/api;apps/api/tests"
+apps/api/.venv/Scripts/python.exe -m unittest test_phase11 test_phase2 test_phase4 test_phase7
+```
 
 ## Configuration and database lifecycle
 

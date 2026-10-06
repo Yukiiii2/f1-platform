@@ -23,6 +23,7 @@ from app.models.telemetry import (
     TelemetrySourceRecord,
     WeatherSample,
 )
+from app.models.updates import SessionUpdateJob
 
 __all__ = [
     "Base",
@@ -47,4 +48,5 @@ __all__ = [
     "TelemetrySample",
     "TelemetrySourceRecord",
     "WeatherSample",
+    "SessionUpdateJob",
 ]

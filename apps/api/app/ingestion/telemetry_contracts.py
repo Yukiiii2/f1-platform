@@ -44,3 +44,17 @@ class TelemetryProvider(Protocol):
     def fetch_session(
         self, source_session: int, drivers: list[int]
     ) -> TelemetryBundle: ...
+
+
+@dataclass(frozen=True)
+class SessionCompletion:
+    year: int
+    session_type: SessionType
+    starts_at: datetime | None
+    ends_at: datetime | None
+    country: str
+    settled: bool
+    completed: bool = False
+    cancelled: bool = False
+    evidence_kind: str | None = None
+    observed_at: datetime | None = None
