@@ -4,7 +4,7 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 7 — Strategy + Tyres, following Phase 07 in `CODEX_PROMPTS.md`.
+Phase 8 — Pitwall AI backend, following Phase 08 in `CODEX_PROMPTS.md`.
 Web and API run independently.
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,
@@ -17,6 +17,10 @@ tyre context, and synchronized channels through the existing application APIs.
 Strategy compares source stints and pit stops, calculated tyre-age snapshots and
 observed non-pit pace, with recorded safety-car/VSC messages. Source boundary
 overlaps and missing records remain explicit; no strategy intent is inferred.
+The optional Pitwall backend provides `POST /v1/ai/query` with structured context,
+read-only application tools, and evidence-separated facts/calculations/estimates/
+interpretations. Configure it server-side as described in `apps/api/README.md`.
+There is no Pitwall frontend yet.
 
 ## Planned V1
 

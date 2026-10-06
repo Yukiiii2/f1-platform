@@ -501,3 +501,74 @@ Focused temporary-database checks:
 ```powershell
 apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_phase7.py -v
 ```
+
+## Pitwall backend (Phase 08)
+
+`POST /v1/ai/query` uses the existing application handlers/services and public DTOs.
+No provider calls, ingestion writes, migrations, reports, frontend AI UI or 3D are
+added. Configure **only** `apps/api/.env`, retaining the existing database settings:
+
+```dotenv
+OPENAI_API_KEY=<server-only-key>
+PITWALL_MODEL=<Responses-model-with-function-calling-and-strict-JSON-support>
+```
+
+Blank/unset AI values leave the data APIs operational; queries return 503 until
+configured. Restart the API after changing environment configuration. Never put
+the key in `NEXT_PUBLIC_*`, client code, requests or committed files. Keys are
+masked in settings and upstream failures return fixed public-safe messages.
+The transport uses existing `httpx` and the official
+[Responses function-calling](https://developers.openai.com/api/docs/guides/function-calling)
+and [structured-output](https://developers.openai.com/api/docs/guides/structured-outputs)
+contracts. Requests set `store=false`; normal API requests transmit the user's
+question/context and retrieved public application data to the configured model.
+
+Example from the repository root with the API running on port 8000:
+
+```powershell
+$sessionId = '<application-session-UUID>'
+$body = @{
+  question = 'Explain the recorded stints and observed pace; distinguish evidence from interpretation.'
+  context = @{ route = '/strategy'; session_id = $sessionId }
+} | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Method Post -Uri 'http://localhost:8000/v1/ai/query' -ContentType 'application/json' -Body $body
+```
+
+Context supports optional `route`, `season` (year), `event_id`, `session_id`,
+`driver_id`, `lap_id`, `stint_id`, `comparison` (the Phase 5 compare request), and
+`allow_approximate`. IDs must be stable domain UUIDs. IDs and relationships are
+validated before contacting the model; missing/inconsistent context returns 422.
+Route text is descriptive, never silently parsed to select an event. When IDs are
+absent the model must retrieve candidate application records before answering.
+
+Read-only tools cover drivers, events/sessions, results, laps, confirmed/source
+telemetry, stints/tyre age, pits, positions, intervals, driver/constructor standings,
+race control, weather, completed-race strategy, and lap comparison. List tools
+return at most 200 records with explicit `truncated`/`next_offset`; comparison
+is capped at 201 points. Approximate-window comparison requires explicit user
+opt-in through context, including `context.comparison.allow_approximate`.
+Queries are bounded to six model rounds, twelve model tool calls and a checked
+60-second orchestration budget; each upstream request has a 20-second HTTP timeout.
+Oversized tool results are explicitly unavailable and require a narrower query.
+
+Responses separate `facts` (source), `calculations` (deterministic derived values),
+`estimates`, `interpretations`, `unavailable`, and `evidence`. Facts, calculations
+and estimates contain evidence IDs/JSON pointers and **server-resolved scalar
+values**; the model cannot supply their values or invent arithmetic. Approximate
+lap starts and comparison traces stay in `estimate`; interpolated confirmed
+traces are `derived`. Delta signs and tyre ages reuse the Phase 5/7 contracts.
+Evidence contains normalized DTOs with nulls intact, never raw provider payloads.
+Unavailable fields, empty imports, page limits and missing channels are explicit.
+Interpretations select a bounded kind (observed pace, pit timing, tyre context or
+lap comparison) and cite relevant evidence. The server checks the required data
+and supplies fixed uncertain wording; arbitrary model prose is rejected, including
+numeric words or unsupported claims hidden in explanations. These are analytical
+caveats, not verified causality or confirmed team intent.
+
+Invalid/unreferenced/misclassified answers or exhausted call budgets return 502,
+without a model-memory fallback. Database/model unavailability returns 503. No
+automatic retry or paid model call occurs in focused tests:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_phase8.py -v
+```
