@@ -461,3 +461,43 @@ Tests use temporary storage and hand-calculated timings, speed integrals and tyr
 ages. They verify endpoint validation, delta signs, variable speed, stationary
 samples, channel interpolation, gaps, provider scope, missing data, approximate
 selection and preservation of raw source revisions and sample associations.
+
+## Strategy + Tyres (Phase 7)
+
+`GET /v1/sessions/{session_id}/strategy` reads existing Phase 4 normalized laps,
+stints, pits and race control. An optional `provider` filter uses the existing
+provider convention. Missing sessions return 404; any session other than a
+recorded completed race returns 422. Empty imports return empty collections,
+never fabricated strategies. No migrations, ingestion changes or provider calls
+are required. Raw source rows and revisions are unchanged.
+
+Each driver/provider is separate. Source stints and pit stops retain the existing
+read schemas. `lap_axis_end` is the largest imported lap/stint-end/pit-lap number,
+not an official race distance. Safety-car/VSC context retains source messages
+whose category/flag or explicit text mentions those controls, including associated
+infringement messages. It does not infer complete deployment periods or team intent.
+
+Tyre snapshots reuse `completed-laps-v1`: usage is
+`age_completed_lap - lap_start + 1`, total age is source starting age + usage.
+For complete unambiguous bounds, the snapshot is the source end lap. When stints
+overlap, the snapshot is the last positive-duration recorded lap uniquely contained
+by that stint. Shared laps are never reassigned. Incomplete bounds or no unambiguous
+snapshot yield null ages/usage; unknown starting age yields null total age.
+The response explicitly identifies the snapshot lap and source context status.
+
+`observed-non-pit-v1` pace is the arithmetic mean and minimum of recorded lap
+durations in each complete source stint. Eligible laps have positive duration,
+source `is_pit_out_lap=false`, unique stint containment, and are neither source pit
+laps nor the following lap. Unknown pit-out state is excluded. A pit with missing
+lap number disables pace for that driver/provider. Missing stint boundaries that
+could overlap disable ambiguous lap assignment. Counts identify recorded, included
+and excluded laps; no eligible laps yield null metrics, not zero. Mean seconds
+are rounded to six decimals. These are observed metrics affected by traffic and
+neutralisations, not clean-air estimates or official lap-validity certification.
+No tyre-health, degradation, fuel correction or strategy-intent model is added.
+
+Focused temporary-database checks:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_phase7.py -v
+```

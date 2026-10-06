@@ -4,16 +4,19 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 6 — Telemetry Lab, using Phase 4 storage and Phase 5 backend comparison.
+Phase 7 — Strategy + Tyres, following Phase 07 in `CODEX_PROMPTS.md`.
 Web and API run independently.
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,
-and the Telemetry Lab at `/telemetry`.
+the Telemetry Lab at `/telemetry`, and completed-race Strategy + Tyres at `/strategy`.
 All race data comes from the application's persisted domain APIs.
 Historical OpenF1 session data can be imported explicitly into normalized storage.
 Telemetry read APIs, deterministic tyre-age calculations, and backend lap
 comparison are available. The Telemetry Lab compares recorded laps, sectors,
 tyre context, and synchronized channels through the existing application APIs.
+Strategy compares source stints and pit stops, calculated tyre-age snapshots and
+observed non-pit pace, with recorded safety-car/VSC messages. Source boundary
+overlaps and missing records remain explicit; no strategy intent is inferred.
 
 ## Planned V1
 

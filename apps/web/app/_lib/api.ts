@@ -39,6 +39,9 @@ async function request<T>(
 export function postEntity<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, {}, body);
 }
+export function getSessionStrategy<T>(sessionId: string): Promise<T> {
+  return request<T>(`sessions/${sessionId}/strategy`);
+}
 export async function getList<T extends { id: string }>(
   path: string,
   query: Record<string, string | number> = {},

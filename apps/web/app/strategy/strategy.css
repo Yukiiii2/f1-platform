@@ -1,0 +1,142 @@
+.strategy-selectors {
+  flex-wrap: wrap;
+}
+.strategy-timeline-region {
+  overflow-x: auto;
+  margin-top: 1.5rem;
+}
+.strategy-timelines {
+  min-width: 680px;
+}
+.strategy-timeline-row {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.strategy-row-label {
+  font-weight: 600;
+}
+.strategy-track {
+  position: relative;
+  height: 76px;
+}
+.strategy-stint {
+  position: absolute;
+  top: 28px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  color: var(--background);
+  background: var(--foreground);
+  border: 1px solid var(--background);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.strategy-stint span {
+  padding: 0 0.4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.strategy-stint:hover {
+  filter: brightness(1.15);
+}
+.strategy-stint:focus-visible {
+  z-index: 3;
+  outline-offset: 3px;
+}
+.compound-soft {
+  background: var(--accent);
+}
+.compound-medium {
+  background: #dec77d;
+}
+.compound-intermediate {
+  background: #98c9ac;
+}
+.compound-wet {
+  background: #9abddf;
+}
+.compound-unknown {
+  background: var(--muted);
+}
+.strategy-pit-marker {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-left: 1px dashed var(--foreground);
+  transform: translateX(-50%);
+  color: var(--foreground);
+  text-decoration: none;
+  z-index: 2;
+}
+.strategy-pit-marker span {
+  display: block;
+  padding: 0 0.3rem;
+  background: var(--background);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.strategy-control-track {
+  height: 44px;
+  position: relative;
+}
+.strategy-control-marker {
+  position: absolute;
+  font-size: 0.7rem;
+  top: 0;
+  transform: translateX(-50%);
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+.strategy-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+}
+.strategy-driver-detail {
+  margin-top: 2rem;
+}
+.strategy-driver-detail h3 {
+  margin-bottom: 1rem;
+}
+.strategy-control-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+}
+.strategy-control-list li {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 2fr;
+  gap: 2rem;
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--border);
+}
+.strategy-control-list p {
+  margin: 0;
+}
+[id^="stint-"],
+[id^="pit-"],
+[id^="control-"] {
+  scroll-margin-top: 6rem;
+}
+@media (max-width: 700px) {
+  .strategy-selectors {
+    align-items: stretch;
+  }
+  .strategy-selectors .field {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .strategy-control-list li {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}

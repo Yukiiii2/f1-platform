@@ -56,6 +56,17 @@ export default async function RacePage({
         title={event.name}
         intro={`${circuit.name} · ${circuit.country}`}
       />
+      {sessions.find(
+        (session) => session.type === "race" && session.status === "completed",
+      ) && (
+        <Link
+          className="back-link"
+          href={`/strategy?${season ? `season=${season.year}&` : ""}event=${event.id}`}
+          prefetch={false}
+        >
+          Explore race strategy and tyres
+        </Link>
+      )}
       <dl className="facts">
         <div>
           <dt>Season</dt>

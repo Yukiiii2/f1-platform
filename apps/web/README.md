@@ -1,4 +1,4 @@
-# Core frontend and Telemetry Lab — Phases 3 and 6
+# Core frontend, Telemetry Lab and Strategy — Phases 3, 6 and 7
 
 Run `npm run dev:web` from the repository root after `npm install`. Configure
 `NEXT_PUBLIC_API_URL` in `apps/web/.env.local` as the application API base address,
@@ -37,8 +37,36 @@ milliseconds are formatted as seconds, not as total race durations.
 The shared shell includes navigation, a skip link, visible focus, semantic tables,
 scrollable table regions, and responsive layouts. Route loading uses static
 skeletons; failed reads use a retry boundary; missing UUIDs use a not-found page.
-The Telemetry Lab adds stored historical lap comparison. No strategy timelines,
-AI, authentication, live updates, or 3D is included.
+The Telemetry Lab adds stored historical lap comparison. Strategy adds completed-race
+stint comparison. No AI, authentication, live updates, or 3D is included.
+
+## Strategy + Tyres (Phase 7)
+
+Open `/strategy?season=2025`, load a race weekend, and compare one or two imported
+driver/provider records. Race detail also links to this view when the recorded race
+status is completed. Season/race changes clear downstream selections. The server
+consumes `/v1/sessions/{id}/strategy`; all age and pace calculations stay in the
+backend. Existing loading, retry and not-found boundaries cover core data reads.
+
+Timelines share an inclusive source lap axis. Compounds remain text-labelled;
+source overlaps occupy separate lanes. Stint/pit/race-control links and detail
+tables work with the keyboard. Small screens scroll inside the labelled timeline
+and table regions. Source pits without lap numbers remain in the table without an
+invented marker. Multiple race-control messages on one lap share an `RC+` marker;
+all original messages remain listed. No deployment interval or pit intent is inferred.
+
+Source starting tyre age stays separate from calculated usage/total age. Each age
+states its completed-lap snapshot, which may precede the reported stint end when
+source bounds overlap. Unknown starting age is unavailable. Observed non-pit pace
+shows coverage and caveats; it includes traffic and neutralisations, and does not
+claim clean-air pace, degradation or tyre-health percentages. See the
+[API policies](../api/README.md#strategy--tyres-phase-7).
+
+Focused display/selection checks:
+
+```powershell
+node --test apps/web/tests/strategy.test.mjs
+```
 
 ## Telemetry Lab (Phase 6)
 
