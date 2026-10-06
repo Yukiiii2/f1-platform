@@ -1,4 +1,4 @@
-# Core frontend, Telemetry Lab and Strategy — Phases 3, 6 and 7
+# Core frontend, Telemetry Lab, Strategy and Pitwall
 
 Run `npm run dev:web` from the repository root after `npm install`. Configure
 `NEXT_PUBLIC_API_URL` in `apps/web/.env.local` as the application API base address,
@@ -38,7 +38,33 @@ The shared shell includes navigation, a skip link, visible focus, semantic table
 scrollable table regions, and responsive layouts. Route loading uses static
 skeletons; failed reads use a retry boundary; missing UUIDs use a not-found page.
 The Telemetry Lab adds stored historical lap comparison. Strategy adds completed-race
-stint comparison. No AI, authentication, live updates, or 3D is included.
+stint comparison. Pitwall adds contextual analysis. No authentication, live updates,
+or 3D is included.
+
+## Pitwall frontend (Phase 09 prompt)
+
+`/pitwall` links to the race, driver, Telemetry Lab and Strategy pages, each with
+an inline Ask Pitwall section. Current validated domain IDs, season and route are
+passed as structured context; Telemetry Lab also supplies the applied comparison
+and its explicit estimated-window permission. Change the page selection before
+asking about another context. Strategy queries attach the displayed driver names
+and domain references to the question because the context contract has only one
+driver field; the backend retrieves the session's strategy records. These selection
+references are ordinary query data, not instructions to override grounding.
+
+A same-origin server action posts to the existing `/v1/ai/query` contract. No model
+configuration or secrets enter browser code. Responses render source data,
+calculations, estimates, interpretation, citations and unavailable fields separately.
+Evidence coverage remains explicit. Requests show a retrieval/analysis message
+without claiming unreported intermediate progress. Rate limits and service failures
+preserve the question for manual retry; context changes clear answers and ignore
+in-flight results. Questions and answers are not persisted in browser storage.
+
+Focused contract, display and transport checks:
+
+```powershell
+node --test apps/web/tests/pitwall.test.mjs apps/web/tests/core.test.mjs apps/web/tests/telemetry.test.mjs apps/web/tests/strategy.test.mjs
+```
 
 ## Strategy + Tyres (Phase 7)
 

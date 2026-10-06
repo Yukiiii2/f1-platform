@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Pitwall } from "../_components/pitwall";
+import { suggestedQuestions } from "../_lib/pitwall";
 import { notFound } from "next/navigation";
 import type { Driver, SearchPageProps } from "../_lib/contracts";
 import { ApiError, getSessionStrategy } from "../_lib/api";
@@ -75,6 +77,11 @@ export default async function StrategyPage({ searchParams }: SearchPageProps) {
       >
         <SeasonSelector seasons={seasons} selected={season} />
       </PageHeading>
+      {event && race && (
+        <a className="back-link" href="#pitwall">
+          Ask Pitwall about this race
+        </a>
+      )}
       {!season ? (
         <NoSeason />
       ) : (
@@ -226,6 +233,45 @@ export default async function StrategyPage({ searchParams }: SearchPageProps) {
             </>
           )}
         </>
+      )}
+      {event && race && season && (
+        <Pitwall
+          selectionKey={selected?.map(strategyKey).join("|") ?? "no-selection"}
+          questionScope={
+            selected?.length
+              ? `Displayed strategy drivers: ${selected.map((row, index) => `${index === 0 ? "A" : "B"} = ${driverName(drivers.get(row.driver_id)!)} (driver ID ${row.driver_id})`).join("; ")}.`
+              : undefined
+          }
+          context={{
+            route: "/strategy",
+            season: season.year,
+            event_id: event.id,
+            session_id: race.id,
+            ...(selected?.length === 1
+              ? { driver_id: selected[0].driver_id }
+              : {}),
+          }}
+          label={`${season.year} · ${event.name}`}
+          contextDetails={[
+            { label: "Session", value: "Race" },
+            ...(selected?.length
+              ? selected.map((row, index) => ({
+                  label: `Driver ${index === 0 ? "A" : "B"}`,
+                  value: driverName(drivers.get(row.driver_id)!),
+                }))
+              : [{ label: "Drivers", value: "No strategy drivers selected" }]),
+          ]}
+          names={Object.fromEntries(
+            [...drivers].map(([id, row]) => [id, driverName(row)]),
+          )}
+          suggestions={suggestedQuestions({
+            page: "strategy",
+            drivers: (selected ?? []).map((row) => ({
+              ...row,
+              name: driverName(drivers.get(row.driver_id)!),
+            })),
+          })}
+        />
       )}
     </>
   );

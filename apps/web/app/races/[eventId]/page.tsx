@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Pitwall } from "../../_components/pitwall";
+import { suggestedQuestions } from "../../_lib/pitwall";
 import { notFound } from "next/navigation";
 import type { RaceEvent, SearchParams, Season } from "../../_lib/contracts";
 import { sessionNames } from "../../_lib/contracts";
@@ -56,6 +58,9 @@ export default async function RacePage({
         title={event.name}
         intro={`${circuit.name} · ${circuit.country}`}
       />
+      <a className="back-link" href="#pitwall">
+        Ask Pitwall about this weekend
+      </a>
       {sessions.find(
         (session) => session.type === "race" && session.status === "completed",
       ) && (
@@ -176,6 +181,34 @@ export default async function RacePage({
           </EmptyState>
         )}
       </section>
+      <Pitwall
+        context={{
+          route: `/races/${event.id}`,
+          event_id: event.id,
+          ...(selected ? { session_id: selected.id } : {}),
+          ...(season ? { season: season.year } : {}),
+        }}
+        label={`${season ? `${season.year} · ` : ""}${event.name}`}
+        contextDetails={[
+          {
+            label: "Session",
+            value: selected
+              ? sessionNames[selected.type]
+              : "No session selected",
+          },
+        ]}
+        names={Object.fromEntries(
+          [...names.drivers].map(([id, row]) => [
+            id,
+            `${row.given_name} ${row.family_name}`,
+          ]),
+        )}
+        suggestions={suggestedQuestions({
+          page: "race",
+          hasSession: Boolean(selected),
+          hasResults: results.length > 0,
+        })}
+      />
     </>
   );
 }

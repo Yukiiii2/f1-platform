@@ -9,6 +9,7 @@ async function request<T>(
   path: string,
   query: Record<string, string | number> = {},
   body?: unknown,
+  timeout = 8000,
 ): Promise<T> {
   try {
     const base = (
@@ -20,7 +21,7 @@ async function request<T>(
     );
     const response = await fetch(url, {
       cache: "no-store",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(timeout),
       ...(body === undefined
         ? {}
         : {
@@ -36,8 +37,12 @@ async function request<T>(
     throw new ApiError();
   }
 }
-export function postEntity<T>(path: string, body: unknown): Promise<T> {
-  return request<T>(path, {}, body);
+export function postEntity<T>(
+  path: string,
+  body: unknown,
+  timeout?: number,
+): Promise<T> {
+  return request<T>(path, {}, body, timeout);
 }
 export function getSessionStrategy<T>(sessionId: string): Promise<T> {
   return request<T>(`sessions/${sessionId}/strategy`);

@@ -1,0 +1,213 @@
+.pitwall {
+  border-top: 1px solid var(--border);
+  padding-top: 2rem;
+  margin-top: 3.5rem;
+  scroll-margin-top: 2rem;
+}
+.pitwall-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 3rem;
+}
+.pitwall-context {
+  margin-bottom: 1.5rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.pitwall-context-title {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.pitwall-context dl {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+}
+.pitwall-context dl > div {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding-block: 0.15rem;
+}
+.pitwall-context dd {
+  margin: 0;
+  color: var(--foreground);
+}
+.pitwall-context dt {
+  color: var(--muted);
+}
+.pitwall-question form {
+  display: grid;
+  gap: 0.6rem;
+}
+.pitwall-question textarea {
+  font: inherit;
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  padding: 0.9rem;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: 0.25rem;
+  caret-color: var(--focus);
+}
+.pitwall-question textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.pitwall-question form > button {
+  justify-self: start;
+  margin-top: 0.5rem;
+}
+.pitwall-note {
+  color: var(--muted);
+  font-size: 0.875rem;
+  max-width: 70ch;
+}
+.pitwall-suggestions {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+.pitwall-suggestions button {
+  font: inherit;
+  font-size: 0.875rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+.pitwall-suggestions button:hover {
+  color: var(--focus);
+}
+.pitwall-suggestions button:disabled:hover {
+  color: var(--muted);
+}
+.pitwall-result {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pitwall-result > [role="status"]:empty {
+  display: none;
+}
+.pitwall-result > [role="status"]:not(:empty) {
+  margin-bottom: 1rem;
+}
+.pitwall-ready {
+  padding-block: 0.5rem;
+  max-width: 65ch;
+}
+.pitwall-ready p {
+  margin-top: 1rem;
+}
+.pitwall-asked {
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.pitwall-answer-group {
+  margin-top: 1.75rem;
+}
+.pitwall-answer-group h3 {
+  margin-bottom: 0.75rem;
+}
+.pitwall-source h3 {
+  color: var(--foreground);
+}
+.pitwall-derived h3 {
+  color: var(--focus);
+}
+.pitwall-estimate h3 {
+  color: var(--muted);
+}
+.pitwall-values {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.pitwall-values > div {
+  padding-block: 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+.pitwall-values dt {
+  color: var(--muted);
+}
+.pitwall-values dd {
+  margin: 0.25rem 0 0;
+}
+.pitwall-answer-group p + p,
+.pitwall-answer > .pitwall-note {
+  margin-top: 0.75rem;
+}
+.pitwall-citation {
+  display: inline-block;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.875rem;
+  color: var(--focus);
+}
+.pitwall-answer-group ul {
+  padding-left: 1.25rem;
+}
+.pitwall-answer-group li + li {
+  margin-top: 0.5rem;
+}
+.pitwall-evidence {
+  margin-top: 1.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.pitwall-evidence summary {
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+.pitwall-evidence ol {
+  padding-left: 1.5rem;
+}
+.pitwall-evidence li {
+  padding-block: 0.5rem;
+  scroll-margin-top: 2rem;
+}
+.pitwall-evidence .pitwall-note {
+  display: block;
+}
+.pitwall-entry-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-width: 65ch;
+}
+.pitwall-entry-list li {
+  border-bottom: 1px solid var(--border);
+}
+.pitwall-entry-list a {
+  display: block;
+  padding-block: 1.5rem;
+  text-decoration: none;
+}
+.pitwall-entry-title {
+  font-size: 1.25rem;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+.pitwall-entry-action {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--focus);
+  font-size: 0.875rem;
+}
+.pitwall-entry-list p {
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+@media (max-width: 900px) {
+  .pitwall-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  .pitwall-result {
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+  }
+}

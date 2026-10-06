@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Pitwall } from "../_components/pitwall";
+import { suggestedQuestions } from "../_lib/pitwall";
 import { ApiError, getList, postEntity } from "../_lib/api";
 import type { Driver, SearchPageProps } from "../_lib/contracts";
 import { sessionNames, statusNames } from "../_lib/contracts";
@@ -67,6 +69,15 @@ export default async function TelemetryPage({ searchParams }: SearchPageProps) {
       }
     }
   }
+  const selectedComparison =
+    session && selected.compare === "1"
+      ? comparisonRequest(laps, selected)
+      : null;
+  const chosenLaps = selectedComparison
+    ? [selectedComparison.lap_a_id, selectedComparison.lap_b_id].map((id) =>
+        laps.find((row) => row.id === id)!,
+      )
+    : [];
   return (
     <>
       <PageHeading
@@ -75,6 +86,11 @@ export default async function TelemetryPage({ searchParams }: SearchPageProps) {
       >
         <SeasonSelector seasons={seasons} selected={season} />
       </PageHeading>
+      {event && session && (
+        <a className="back-link" href="#pitwall">
+          Ask Pitwall about this session
+        </a>
+      )}
       {!season ? (
         <NoSeason />
       ) : (
@@ -229,6 +245,52 @@ export default async function TelemetryPage({ searchParams }: SearchPageProps) {
             ) : null}
           </section>
         </>
+      )}
+      {event && session && season && (
+        <Pitwall
+          context={{
+            route: "/telemetry",
+            season: season.year,
+            event_id: event.id,
+            session_id: session.id,
+            ...(selectedComparison
+              ? {
+                  comparison: selectedComparison,
+                  lap_id: selectedComparison.lap_a_id,
+                  allow_approximate: selectedComparison.allow_approximate,
+                }
+              : {}),
+          }}
+          label={`${season.year} · ${event.name}`}
+          contextDetails={[
+            {
+              label: "Session",
+              value: `${sessionNames[session.type]} · ${statusNames[session.status]}`,
+            },
+            ...chosenLaps.map((lap, index) => ({
+              label: `Lap ${index === 0 ? "A" : "B"}`,
+              value: `${driverName(driverMap.get(lap.driver_id)!)} · Lap ${lap.lap_number}`,
+            })),
+            ...(!chosenLaps.length
+              ? [
+                  {
+                    label: "Laps",
+                    value: laps.length
+                      ? "No comparison selected"
+                      : "No recorded laps",
+                  },
+                ]
+              : []),
+          ]}
+          names={Object.fromEntries(
+            [...driverMap].map(([id, row]) => [id, driverName(row)]),
+          )}
+          suggestions={suggestedQuestions({
+            page: "telemetry",
+            hasLaps: laps.length > 0,
+            comparison,
+          })}
+        />
       )}
     </>
   );

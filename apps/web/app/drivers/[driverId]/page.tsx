@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Pitwall } from "../../_components/pitwall";
+import { suggestedQuestions } from "../../_lib/pitwall";
 import type { Driver, SearchParams, Team } from "../../_lib/contracts";
 import { sessionNames } from "../../_lib/contracts";
 import {
@@ -78,6 +80,9 @@ export default async function DriverPage({
       <PageHeading title={driverName(driver)} intro="Driver profile">
         <SeasonSelector seasons={seasons} selected={season} />
       </PageHeading>
+      <a className="back-link" href="#pitwall">
+        Ask Pitwall about this driver
+      </a>
       <dl className="facts">
         <div>
           <dt>Permanent number</dt>
@@ -221,6 +226,27 @@ export default async function DriverPage({
           </section>
         </>
       )}
+      <Pitwall
+        context={{
+          route: `/drivers/${driver.id}`,
+          driver_id: driver.id,
+          ...(season ? { season: season.year } : {}),
+          ...(selected ? { event_id: selected.id } : {}),
+        }}
+        label={driverName(driver)}
+        contextDetails={[
+          ...(season ? [{ label: "Season", value: String(season.year) }] : []),
+          { label: "Weekend", value: selected?.name ?? "No weekend selected" },
+        ]}
+        names={{ [driver.id]: driverName(driver) }}
+        suggestions={suggestedQuestions({
+          page: "driver",
+          hasWeekend: Boolean(selected),
+          hasResults: recorded.length > 0,
+          hasSeason: Boolean(season),
+          hasStanding: Boolean(standing),
+        })}
+      />
     </>
   );
 }
