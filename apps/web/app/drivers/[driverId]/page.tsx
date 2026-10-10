@@ -74,7 +74,11 @@ export default async function DriverPage({
   );
   return (
     <>
-      <Link className="back-link" href="/drivers" prefetch={false}>
+      <Link
+        className="back-link"
+        href={season ? `/drivers?season=${season.year}` : "/drivers"}
+        prefetch={false}
+      >
         Back to drivers
       </Link>
       <PageHeading title={driverName(driver)} intro="Driver profile">
@@ -193,7 +197,7 @@ export default async function DriverPage({
                           <tr key={result.id}>
                             <th scope="row">
                               <Link
-                                href={`/races/${selected?.id}?session=${session.id}#results`}
+                                href={`/races/${selected?.id}?season=${season.year}&session=${session.id}#results`}
                                 prefetch={false}
                               >
                                 {sessionNames[session.type]}

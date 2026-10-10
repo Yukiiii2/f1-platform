@@ -2,14 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Driver, SearchPageProps } from "../_lib/contracts";
 import { getList } from "../_lib/api";
+import { seasonContext } from "../_lib/data";
 import { driverName, single } from "../_lib/format";
-import { EmptyState, PageHeading } from "../_components/ui";
+import {
+  EmptyState,
+  NoSeason,
+  PageHeading,
+  SeasonSelector,
+} from "../_components/ui";
 export const metadata: Metadata = { title: "Drivers" };
 export default async function DriversPage({ searchParams }: SearchPageProps) {
-  const [drivers, params] = await Promise.all([
-    getList<Driver>("drivers"),
-    searchParams,
-  ]);
+  const params = await searchParams;
+  const { seasons, season } = await seasonContext(params);
+  const drivers = season
+    ? await getList<Driver>("drivers", { season: season.year })
+    : [];
   const query = (single(params.q) ?? "").trim();
   const visible = drivers
     .filter((driver) =>
@@ -26,9 +33,17 @@ export default async function DriversPage({ searchParams }: SearchPageProps) {
     <>
       <PageHeading
         title="The drivers."
-        intro="Explore the drivers recorded across available seasons."
-      />
+        intro="Explore recorded drivers in the selected season."
+      >
+        <SeasonSelector
+          seasons={seasons}
+          selected={season}
+          preserve={query ? { q: query } : {}}
+        />
+      </PageHeading>
+      {!season && <NoSeason />}
       <form method="get" className="search-form">
+        {season && <input type="hidden" name="season" value={season.year} />}
         <div className="field">
           <label htmlFor="driver-search">Find a driver</label>
           <input
@@ -45,7 +60,10 @@ export default async function DriversPage({ searchParams }: SearchPageProps) {
           Search
         </button>
         {query && (
-          <Link href="/drivers" prefetch={false}>
+          <Link
+            href={season ? `/drivers?season=${season.year}` : "/drivers"}
+            prefetch={false}
+          >
             Clear search
           </Link>
         )}
@@ -71,7 +89,10 @@ export default async function DriversPage({ searchParams }: SearchPageProps) {
                 </div>
                 <div>
                   <h2>
-                    <Link href={`/drivers/${driver.id}`} prefetch={false}>
+                    <Link
+                      href={`/drivers/${driver.id}?season=${season?.year}`}
+                      prefetch={false}
+                    >
                       {driverName(driver)}
                     </Link>
                   </h2>
@@ -82,7 +103,7 @@ export default async function DriversPage({ searchParams }: SearchPageProps) {
                 </div>
                 <Link
                   className="profile-link"
-                  href={`/drivers/${driver.id}`}
+                  href={`/drivers/${driver.id}?season=${season?.year}`}
                   prefetch={false}
                   aria-label={`View ${driverName(driver)} profile`}
                 >
@@ -102,7 +123,10 @@ export default async function DriversPage({ searchParams }: SearchPageProps) {
               : "No driver records have been imported yet. Return after race data has been added."}
           </p>
           {query && (
-            <Link href="/drivers" prefetch={false}>
+            <Link
+              href={season ? `/drivers?season=${season.year}` : "/drivers"}
+              prefetch={false}
+            >
               Show all drivers
             </Link>
           )}

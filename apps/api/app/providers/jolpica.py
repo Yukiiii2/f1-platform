@@ -134,6 +134,7 @@ class JolpicaProvider:
     def fetch(self, year: int, round_number: int | None = None) -> ImportBundle:
         if year < 1950 or (round_number is not None and round_number < 1):
             raise ValueError("Invalid season or round")
+        observed = datetime.now(timezone.utc)
         prefix = f"{year}/" + (f"{round_number}/" if round_number else "")
         data = {}
         for endpoint, table, key, nested in [
@@ -155,7 +156,7 @@ class JolpicaProvider:
                 prefix + endpoint + ".json", table, key, nested
             )
         try:
-            return normalize(data, year, round_number)
+            return normalize(data, year, round_number, observed_at=observed)
         except (ValueError, TypeError, KeyError) as error:
             raise ProviderError(
                 "Jolpica core data is incomplete or inconsistent"

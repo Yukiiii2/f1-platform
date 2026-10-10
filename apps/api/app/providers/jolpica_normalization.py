@@ -41,7 +41,13 @@ def gap_milliseconds(value: str | None) -> int | None:
     return int(milliseconds)
 
 
-def normalize(data: dict, year: int, requested_round: int | None) -> ImportBundle:
+def normalize(
+    data: dict,
+    year: int,
+    requested_round: int | None,
+    *,
+    observed_at: datetime | None = None,
+) -> ImportBundle:
     records = {}
 
     def add(kind, external_id, attributes, references=None):
@@ -54,6 +60,14 @@ def normalize(data: dict, year: int, requested_round: int | None) -> ImportBundl
             if value is not None or key in {"starts_at", "position"} or kind == "result"
         }
         if previous:
+            if kind == "result" and (
+                previous.attributes != attributes
+                or previous.references != (references or {})
+            ):
+                raise ValueError(
+                    "Conflicting classifications for the same driver/session "
+                    "are unsupported"
+                )
             attributes = previous.attributes | attributes
             references = previous.references | (references or {})
         records[kind, external_id] = NormalizedRecord(
@@ -231,4 +245,8 @@ def normalize(data: dict, year: int, requested_round: int | None) -> ImportBundl
                         **ref,
                     },
                 )
-    return ImportBundle(list(records.values()), datetime.now(timezone.utc))
+    return ImportBundle(
+        list(records.values()),
+        observed_at or datetime.now(timezone.utc),
+        raw_payload=data,
+    )

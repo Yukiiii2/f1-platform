@@ -111,10 +111,11 @@ def standings(db, kind, **arguments):
 
 TOOLS = {
     "get_drivers": Tool(
-        Page,
+        Events,
         core.drivers,
         schemas.DriverRead,
-        "List recorded drivers; paginate to find a domain UUID.",
+        "List recorded drivers, optionally scoped to a season; "
+        "paginate to find a domain UUID.",
     ),
     "get_driver": Tool(
         DriverID, core.driver, schemas.DriverRead, "Read a driver by application UUID."

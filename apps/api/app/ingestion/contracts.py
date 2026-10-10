@@ -29,3 +29,4 @@ class ImportBundle:
     records: list[NormalizedRecord]
     fetched_at: datetime
     source_updated_at: datetime | None = None
+    raw_payload: dict | None = None

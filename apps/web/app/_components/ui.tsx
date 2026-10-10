@@ -66,14 +66,16 @@ export function SeasonSelector({
   seasons,
   selected,
   preserve = {},
+  action,
 }: {
   seasons: Season[];
   selected: Season | null;
   preserve?: Record<string, string>;
+  action?: string;
 }) {
   if (!seasons.length) return null;
   return (
-    <form className="filter-form" method="get">
+    <form className="filter-form" method="get" action={action}>
       {Object.entries(preserve).map(([key, value]) => (
         <input key={key} type="hidden" name={key} value={value} />
       ))}
@@ -90,16 +92,27 @@ export function SeasonSelector({
               Choose a season
             </option>
           )}
-          {seasons.map((season) => (
-            <option key={season.id} value={season.year}>
-              {season.year}
-            </option>
-          ))}
+          {seasons
+            .filter((season) => season.availability !== "unavailable")
+            .map((season) => (
+              <option key={season.id} value={season.year}>
+                {season.year}
+                {season.availability === "partial"
+                  ? " · Partially imported"
+                  : " · Imported"}
+              </option>
+            ))}
         </select>
       </div>
       <button type="submit" className="button button-quiet">
         View season
       </button>
+      {selected?.availability === "partial" && (
+        <p className="section-note">
+          Partially imported season. Missing results or standings remain
+          unavailable.
+        </p>
+      )}
     </form>
   );
 }

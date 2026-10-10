@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import localFont from "next/font/local";
-import { Navigation } from "./_components/navigation";
+import { Navigation, SeasonHomeLink } from "./_components/navigation";
 import "./globals.css";
 
 const displayFont = localFont({
@@ -30,26 +31,35 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </a>
         <header className="site-header">
           <div className="shell header-inner">
-            <Link
-              className="brand"
-              href="/"
-              prefetch={false}
-              aria-label="F1 Intelligence home"
+            <Suspense
+              fallback={
+                <Link className="brand" href="/" prefetch={false}>
+                  F1 Intelligence
+                </Link>
+              }
             >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 32 32"
-                width="32"
-                height="32"
-              >
-                <path
-                  d="M4 5h24v5H4zm0 9h17v5H4zm0 9h10v5H4z"
-                  fill="currentColor"
-                />
-              </svg>
-              <span>F1 Intelligence</span>
-            </Link>
-            <Navigation />
+              <SeasonHomeLink>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 32 32"
+                  width="32"
+                  height="32"
+                >
+                  <path
+                    d="M4 5h24v5H4zm0 9h17v5H4zm0 9h10v5H4z"
+                    fill="currentColor"
+                  />
+                </svg>
+                <span>F1 Intelligence</span>
+              </SeasonHomeLink>
+            </Suspense>
+            <Suspense
+              fallback={
+                <nav aria-label="Main navigation">Loading navigation…</nav>
+              }
+            >
+              <Navigation />
+            </Suspense>
           </div>
         </header>
         <main id="main-content" className="shell" tabIndex={-1}>

@@ -15,16 +15,19 @@ import {
   formatPoints,
   formatSchedule,
   rank,
+  seasonHref,
 } from "../_lib/format";
 import { TableRegion } from "./ui";
 export function EventTable({
   events,
   circuits,
   caption = "Race calendar",
+  year,
 }: {
   events: RaceEvent[];
   circuits: Map<string, Circuit>;
   caption?: string;
+  year?: number;
 }) {
   return (
     <TableRegion label={caption}>
@@ -46,7 +49,10 @@ export function EventTable({
                   {String(event.round).padStart(2, "0")}
                 </td>
                 <th scope="row">
-                  <Link href={`/races/${event.id}`} prefetch={false}>
+                  <Link
+                    href={seasonHref(`/races/${event.id}`, year)}
+                    prefetch={false}
+                  >
                     {event.name}
                   </Link>
                   <span className="cell-detail">

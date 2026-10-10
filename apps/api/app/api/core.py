@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app import models, schemas
 from app.db.session import get_db
-from app.schemas.domain import SessionUpdateRead
+from app.schemas.domain import SeasonAvailability, SessionUpdateRead
 from app.services import core
 
 router = APIRouter(tags=["core"])
@@ -55,7 +55,7 @@ def require(db, model, identifier):
 
 @router.get("/seasons", response_model=list[schemas.SeasonRead])
 def seasons(db: Database, limit: Limit = 50, offset: Offset = 0):
-    return list(
+    rows = list(
         db.scalars(
             select(models.Season)
             .order_by(models.Season.year.desc())
@@ -63,6 +63,20 @@ def seasons(db: Database, limit: Limit = 50, offset: Offset = 0):
             .offset(offset)
         )
     )
+    coverage = core.season_availability(db, [row.year for row in rows])
+    return [
+        schemas.SeasonRead.model_validate(row).model_copy(
+            update=coverage[row.year].model_dump(exclude={"year", "season_id"})
+        )
+        for row in rows
+    ]
+
+
+@router.get("/seasons/{year}/availability", response_model=SeasonAvailability)
+def season_availability(db: Database, year: int):
+    if not 1950 <= year <= 9999:
+        raise HTTPException(422, "Invalid season")
+    return core.season_availability(db, [year])[year]
 
 
 @router.get("/events", response_model=list[schemas.EventRead])
@@ -146,9 +160,13 @@ def circuit(db: Database, circuit_id: UUID):
 
 @router.get("/drivers", response_model=list[schemas.DriverRead])
 def drivers(
-    db: Database, limit: Limit = 50, offset: Offset = 0, ids: IdentityFilter = None
+    db: Database,
+    limit: Limit = 50,
+    offset: Offset = 0,
+    ids: IdentityFilter = None,
+    season: Year | None = None,
 ):
-    return core.list_entities(db, models.Driver, limit, offset, ids)
+    return core.list_entities(db, models.Driver, limit, offset, ids, year=season)
 
 
 @router.get("/drivers/{driver_id}", response_model=schemas.DriverRead)

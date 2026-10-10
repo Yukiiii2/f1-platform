@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SessionUpdates } from "../../_components/session-updates";
 import { Pitwall } from "../../_components/pitwall";
 import { suggestedQuestions } from "../../_lib/pitwall";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { RaceEvent, SearchParams, Season } from "../../_lib/contracts";
 import { sessionNames } from "../../_lib/contracts";
 import { getList } from "../../_lib/api";
@@ -21,6 +21,7 @@ import {
   PageHeading,
   SectionHeading,
   Status,
+  SeasonSelector,
 } from "../../_components/ui";
 export const metadata: Metadata = { title: "Race weekend" };
 export default async function RacePage({
@@ -39,6 +40,17 @@ export default async function RacePage({
     searchParams,
   ]);
   const season = seasons.find((row) => row.id === event.season_id);
+  if (
+    season &&
+    single(query.season) !== undefined &&
+    single(query.season) !== String(season.year)
+  )
+    notFound();
+  if (season && single(query.season) === undefined) {
+    const canonical = new URLSearchParams({ season: String(season.year) });
+    if (single(query.session)) canonical.set("session", single(query.session)!);
+    redirect(`/races/${event.id}?${canonical}`);
+  }
   const selectedId = single(query.session);
   const selected = selectedId
     ? sessions.find((session) => session.id === selectedId)
@@ -58,7 +70,13 @@ export default async function RacePage({
       <PageHeading
         title={event.name}
         intro={`${circuit.name} · ${circuit.country}`}
-      />
+      >
+        <SeasonSelector
+          seasons={seasons}
+          selected={season ?? null}
+          action="/races"
+        />
+      </PageHeading>
       <a className="back-link" href="#pitwall">
         Ask Pitwall about this weekend
       </a>
@@ -131,7 +149,7 @@ export default async function RacePage({
             {sessions.map((session) => (
               <Link
                 key={session.id}
-                href={`/races/${event.id}?session=${session.id}#results`}
+                href={`/races/${event.id}?season=${season?.year}&session=${session.id}#results`}
                 prefetch={false}
                 aria-current={selected?.id === session.id ? "page" : undefined}
               >

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import time
 from datetime import datetime, timezone
@@ -46,6 +47,46 @@ def persist_bundle(
             hashlib.sha256(f"f1-import:{provider}".encode()).digest()[:8], signed=True
         )
         db.execute(select(func.pg_advisory_xact_lock(lock)))
+    if bundle.fetched_at.tzinfo is None or bundle.fetched_at.utcoffset() is None:
+        raise ValueError("An aware source observation is required")
+    if bundle.raw_payload is not None:
+        season_record = next(
+            record for record in bundle.records if record.kind == "season"
+        )
+        digest = hashlib.sha256(
+            json.dumps(
+                bundle.raw_payload, sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
+        # Season + represented rounds scopes whole-season and independent round imports.
+        scope = (
+            season_record.external_id
+            + ":"
+            + ",".join(
+                sorted(
+                    record.external_id.split(":")[-1]
+                    for record in bundle.records
+                    if record.kind == "event"
+                )
+            )
+        )
+        revision = db.scalar(
+            select(models.CoreSourceRevision).where(
+                models.CoreSourceRevision.provider == provider,
+                models.CoreSourceRevision.scope == scope,
+                models.CoreSourceRevision.content_hash == digest,
+            )
+        )
+        if revision is None:
+            db.add(
+                models.CoreSourceRevision(
+                    provider=provider,
+                    scope=scope,
+                    content_hash=digest,
+                    payload=bundle.raw_payload,
+                    observed_at=bundle.fetched_at,
+                )
+            )
     counts = {}
     resolved = {}
     order = {kind: index for index, kind in enumerate(ENTITIES)}
@@ -74,6 +115,14 @@ def persist_bundle(
             )
         )
         row = db.get(model, identity.domain_id) if identity else None
+        state = db.get(models.CoreSourceState, identity.id) if identity else None
+        if state is not None:
+            last = state.observed_at
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if last > bundle.fetched_at:
+                resolved[record.kind, record.external_id] = identity.domain_id
+                continue
         if identity and row is None:
             raise ValueError("Provider identity references a missing domain row")
         if row is None and natural_keys:
@@ -93,14 +142,22 @@ def persist_bundle(
             for field, value in validated.model_dump(exclude_unset=True).items():
                 setattr(row, field, value)
         if identity is None:
+            identity = models.ProviderIdentity(
+                provider=provider,
+                entity_kind=record.kind,
+                external_id=record.external_id,
+                domain_id=row.id,
+            )
+            db.add(identity)
+            db.flush()
+        if state is None:
             db.add(
-                models.ProviderIdentity(
-                    provider=provider,
-                    entity_kind=record.kind,
-                    external_id=record.external_id,
-                    domain_id=row.id,
+                models.CoreSourceState(
+                    identity_id=identity.id, observed_at=bundle.fetched_at
                 )
             )
+        else:
+            state.observed_at = bundle.fetched_at
         resolved[record.kind, record.external_id] = row.id
         counts[record.kind] = counts.get(record.kind, 0) + 1
         db.flush()

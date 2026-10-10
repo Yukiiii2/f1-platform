@@ -124,7 +124,7 @@ export default async function StrategyPage({ searchParams }: SearchPageProps) {
             {event && (
               <p className="section-note">
                 <Link
-                  href={`/races/${event.id}${race ? `?session=${race.id}` : ""}`}
+                  href={`/races/${event.id}?season=${season.year}${race ? `&session=${race.id}` : ""}`}
                   prefetch={false}
                 >
                   {event.name}

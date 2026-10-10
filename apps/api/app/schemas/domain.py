@@ -48,8 +48,24 @@ class SeasonCreate(Schema):
     year: int = Field(ge=1950)
 
 
+class SeasonAvailability(Schema):
+    year: int = Field(ge=1950)
+    season_id: UUID | None = None
+    availability: Literal["imported", "partial", "unavailable"] = "unavailable"
+    event_count: int = 0
+    result_event_count: int = 0
+    driver_standings_available: bool = False
+    constructor_standings_available: bool = False
+    last_imported_at: AwareDatetime | None = None
+
+
 class SeasonRead(SeasonCreate, ReadFields):
-    pass
+    availability: Literal["imported", "partial", "unavailable"] = "partial"
+    event_count: int = 0
+    result_event_count: int = 0
+    driver_standings_available: bool = False
+    constructor_standings_available: bool = False
+    last_imported_at: AwareDatetime | None = None
 
 
 class CircuitCreate(Schema):

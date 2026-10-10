@@ -6,6 +6,11 @@ export interface Entity {
 }
 export interface Season extends Entity {
   year: number;
+  availability?: "imported" | "partial" | "unavailable";
+  event_count?: number;
+  result_event_count?: number;
+  driver_standings_available?: boolean;
+  constructor_standings_available?: boolean;
 }
 export interface Schedule {
   scheduled_date: string | null;

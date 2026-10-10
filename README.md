@@ -1,10 +1,17 @@
 # F1 Intelligence Platform
 
+V2 Phase 2 adds historical season browsing through the existing pages. Import a
+year explicitly with `python -m app.ingestion --season <YEAR>` using the API virtual
+environment and `PYTHONPATH=apps/api`; apply migration `0008_historical_core_sources`
+first. Season selectors show recorded core coverage and retain the selected year
+in navigation. Core imports do not imply telemetry availability. See the
+[historical-season setup and verification commands](apps/api/README.md#historical-seasons-v2-phase-2).
+
 An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-V1 Phase 0-12 foundation with V2 Phase 1 near-live session updates.
+V1 Phase 0-12 foundation with V2 near-live session updates and historical seasons.
 Web and API run independently.
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,

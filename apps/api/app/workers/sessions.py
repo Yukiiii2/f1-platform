@@ -77,6 +77,13 @@ def register_session(
             for identifier in driver_ids.values()
         ):
             raise ValueError("Import domain session/drivers first")
+        if live and (
+            session.status in {SessionStatus.COMPLETED, SessionStatus.CANCELLED}
+            or (session.scheduled_date and session.scheduled_date < now.date())
+        ):
+            raise ValueError(
+                "Historical completed sessions cannot enter near-live polling"
+            )
         job = db.scalar(
             select(models.SessionUpdateJob).where(
                 models.SessionUpdateJob.session_id == session_id

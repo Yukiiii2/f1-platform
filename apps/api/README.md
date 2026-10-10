@@ -10,6 +10,74 @@ read APIs, an immutable source-revision ledger, and deterministic tyre age.
 Phase 5 adds a read-only lap-comparison service using these persisted records.
 Phase 11 (prompt numbering) adds an explicit historical post-session worker.
 
+## Historical seasons (V2 Phase 2)
+
+From the repository root, import one additional season independently:
+
+```powershell
+$env:PYTHONPATH = "apps/api"
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+apps/api/.venv/Scripts/python.exe -m app.ingestion --season 2010
+Invoke-RestMethod "http://localhost:8000/v1/seasons/2010/availability"
+Invoke-RestMethod "http://localhost:8000/v1/events?season=2010&limit=200"
+Invoke-RestMethod "http://localhost:8000/v1/drivers?season=2010&limit=200"
+Invoke-RestMethod "http://localhost:8000/v1/standings/drivers?season=2010&limit=200"
+Invoke-RestMethod "http://localhost:8000/v1/standings/constructors?season=2010&limit=200"
+```
+
+FastAPI must be running for the verification requests. Open `/races?season=2010`
+in the web app. Repeat the import to apply source corrections without changing
+domain UUIDs or duplicating records. `--season <YEAR> --round <ROUND>` remains
+available for an independent weekend; there is no startup or automatic all-history
+import. Existing 2025 imports continue unchanged. The existing provider paginates
+at 100 records, paces requests and bounds retries; run season imports sequentially,
+respecting [Jolpica's published rate limits](https://github.com/jolpica/jolpica-f1/blob/main/docs/rate_limits.md).
+
+Migration `0008_historical_core_sources` adds private `core_source_revisions` and
+`core_source_states`. Core raw collection snapshots are hashed and archived once
+per changed source revision. An aware timestamp taken **before** provider requests
+orders normalized updates under the existing provider transaction lock. Older
+observations remain archived but cannot overwrite newer corrections; unchanged
+observations advance the ordering watermark. Existing successful import metadata
+provides a conservative ordering floor during migration. Earlier raw payloads
+cannot be recovered and are not fabricated. No additional configuration is needed.
+
+`GET /v1/seasons` lists persisted seasons with additive coverage fields. The
+bounded `GET /v1/seasons/{year}/availability` also reports years not imported:
+
+- `imported`: a successful whole-season core fetch, calendar, recorded race
+  results for elapsed calendar dates, and both latest driver/constructor snapshots
+  covering the elapsed rounds.
+- `partial`: some calendar records exist, but the whole-season import or that
+  core coverage is missing. Round-only imports and historical source gaps can
+  leave this state, including years without constructor standings.
+- `unavailable`: no imported calendar for that year; no provider request is made.
+
+Counts and category availability are deterministic coverage calculations, not a
+claim that every classification, qualifying time or session exists in the source.
+The selector offers imported/partial years; an unavailable requested year never
+silently falls back to another year. Driver lists use recorded season results and
+standing membership; identity details remain shared, and results/teams/points are
+season-scoped. APIs retain bounded `limit`/`offset` pagination and batch identities.
+
+Historical weekends display only source-supplied sessions/classifications;
+missing sprint, qualifying, practice or standings records stay unavailable. A
+conflicting multi-car classification for the same driver/session cannot be
+represented by the existing single-result contract, and is rejected atomically
+rather than silently merged.
+
+Core season imports do **not** import telemetry, register workers, or change
+existing live scopes. A completed historical session cannot be registered with
+`--live`; explicit historical post-session registration remains supported.
+Telemetry Lab/Strategy use existing empty states unless OpenF1 records have been
+separately imported. Pitwall receives the selected historical year/event/session
+and uses the existing read-only tools and grounding/protection rules.
+
+Operational review: apply the migration, import/rerun 2010, confirm availability
+and both standing categories, inspect a race detail and driver profile, then check
+Telemetry Lab/Strategy and a contextual Pitwall query report missing records.
+No live model call is required by automated tests.
+
 ## Automatic post-session updates (Phase 11 prompt)
 
 Run migrations first (`0004_session_updates`). The worker is a separate process,

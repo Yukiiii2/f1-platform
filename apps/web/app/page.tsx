@@ -93,7 +93,7 @@ export default async function HomePage({ searchParams }: SearchPageProps) {
             </p>
             <Link
               className="button"
-              href={`/races/${featured.id}`}
+              href={`/races/${featured.id}?season=${season.year}`}
               prefetch={false}
             >
               Explore the weekend
@@ -197,6 +197,7 @@ export default async function HomePage({ searchParams }: SearchPageProps) {
         </SectionHeading>
         {calendar.length ? (
           <EventTable
+            year={season.year}
             events={calendar}
             circuits={circuits}
             caption="Next scheduled race weekends"

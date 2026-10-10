@@ -1,21 +1,40 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PageHeading, SectionHeading } from "../_components/ui";
+import {
+  NoSeason,
+  PageHeading,
+  SectionHeading,
+  SeasonSelector,
+} from "../_components/ui";
+import { seasonContext } from "../_lib/data";
+import { seasonHref, single } from "../_lib/format";
+import type { SearchPageProps } from "../_lib/contracts";
 import "./pitwall.css";
 
 export const metadata: Metadata = { title: "Pitwall" };
-export default function PitwallPage() {
+export default async function PitwallPage({ searchParams }: SearchPageProps) {
+  const query = await searchParams;
+  const { seasons, season } = await seasonContext(query);
+  const requested = single(query.season);
+  const year =
+    season?.year ??
+    (requested && /^\d{4}$/.test(requested) && Number(requested) >= 1950
+      ? Number(requested)
+      : undefined);
   return (
     <>
       <PageHeading
         title="Pitwall."
         intro="Ask about the race data you are exploring. Open a page, choose your context, then ask Pitwall for analysis."
-      />
+      >
+        <SeasonSelector seasons={seasons} selected={season} />
+      </PageHeading>
+      {!season && <NoSeason />}
       <section aria-label="Choose an analysis context">
         <SectionHeading title="Start with the records" />
         <ul className="pitwall-entry-list">
           <li>
-            <Link href="/races" prefetch={false}>
+            <Link href={seasonHref("/races", year)} prefetch={false}>
               <span className="pitwall-entry-title">Race weekends</span>
               <p>
                 Results, recorded session conditions and championship context.
@@ -24,7 +43,7 @@ export default function PitwallPage() {
             </Link>
           </li>
           <li>
-            <Link href="/drivers" prefetch={false}>
+            <Link href={seasonHref("/drivers", year)} prefetch={false}>
               <span className="pitwall-entry-title">Driver profiles</span>
               <p>
                 A driver’s recorded results in the season and weekend you
@@ -34,7 +53,7 @@ export default function PitwallPage() {
             </Link>
           </li>
           <li>
-            <Link href="/telemetry" prefetch={false}>
+            <Link href={seasonHref("/telemetry", year)} prefetch={false}>
               <span className="pitwall-entry-title">Telemetry Lab</span>
               <p>
                 Select a session and check its recorded laps and channels before
@@ -46,7 +65,7 @@ export default function PitwallPage() {
             </Link>
           </li>
           <li>
-            <Link href="/strategy" prefetch={false}>
+            <Link href={seasonHref("/strategy", year)} prefetch={false}>
               <span className="pitwall-entry-title">Strategy + Tyres</span>
               <p>
                 Recorded stint sequence, pit timing, tyre age and observed pace.

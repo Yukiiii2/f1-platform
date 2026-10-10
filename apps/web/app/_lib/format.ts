@@ -34,13 +34,22 @@ export function formatSchedule(value: {
     : "Time unavailable";
   return `${day} · ${time}`;
 }
-export function selectSeason<T extends { year: number }>(
+export function selectSeason<T extends { year: number; availability?: string }>(
   seasons: T[],
   requested?: string,
 ): T | null {
+  seasons = seasons.filter((season) => season.availability !== "unavailable");
   if (requested !== undefined)
     return seasons.find((season) => String(season.year) === requested) || null;
   return [...seasons].sort((a, b) => b.year - a.year)[0] || null;
+}
+export function seasonHref(path: string, year?: number | null): string {
+  if (!year) return path;
+  const [base, hash] = path.split("#", 2);
+  const [route, search] = base.split("?", 2);
+  const params = new URLSearchParams(search);
+  params.set("season", String(year));
+  return `${route}?${params}${hash === undefined ? "" : `#${hash}`}`;
 }
 export function single(
   value: string | string[] | undefined,

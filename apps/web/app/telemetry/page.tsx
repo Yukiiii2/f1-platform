@@ -170,7 +170,7 @@ export default async function TelemetryPage({ searchParams }: SearchPageProps) {
             {event && (
               <p className="section-note">
                 <Link
-                  href={`/races/${event.id}${session ? `?session=${session.id}` : ""}`}
+                  href={`/races/${event.id}?season=${season.year}${session ? `&session=${session.id}` : ""}`}
                   prefetch={false}
                 >
                   {event.name}

@@ -32,7 +32,7 @@ export default async function RacesPage({ searchParams }: SearchPageProps) {
             {events.length} recorded weekends in {season.year}. Dates without
             source times remain date-only.
           </p>
-          <EventTable events={events} circuits={circuits} />
+          <EventTable events={events} circuits={circuits} year={season.year} />
         </>
       ) : (
         <EmptyState title="No race weekends yet">

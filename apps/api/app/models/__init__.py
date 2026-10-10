@@ -1,4 +1,5 @@
 from app.db.base import Base
+from app.models.core_sources import CoreSourceRevision, CoreSourceState
 from app.models.domain import (
     Circuit,
     ConstructorStanding,
@@ -27,6 +28,8 @@ from app.models.telemetry import (
 from app.models.updates import SessionUpdateJob
 
 __all__ = [
+    "CoreSourceRevision",
+    "CoreSourceState",
     "Base",
     "Circuit",
     "ConstructorStanding",
