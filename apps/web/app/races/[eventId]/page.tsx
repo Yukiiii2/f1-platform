@@ -3,18 +3,17 @@ import Link from "next/link";
 import { SessionUpdates } from "../../_components/session-updates";
 import { Pitwall } from "../../_components/pitwall";
 import { suggestedQuestions } from "../../_lib/pitwall";
-import { notFound, redirect } from "next/navigation";
-import type { RaceEvent, SearchParams, Season } from "../../_lib/contracts";
+import { redirect } from "next/navigation";
+import type { SearchParams } from "../../_lib/contracts";
 import { sessionNames } from "../../_lib/contracts";
-import { getList } from "../../_lib/api";
 import {
   circuitDetail,
-  detail,
-  eventSessions,
+  raceContext,
   resultNames,
   sessionResults,
 } from "../../_lib/data";
 import { formatSchedule, single } from "../../_lib/format";
+import { replayHref } from "../../_lib/replay";
 import { ResultsTable } from "../../_components/tables";
 import {
   EmptyState,
@@ -31,33 +30,26 @@ export default async function RacePage({
   params: Promise<{ eventId: string }>;
   searchParams: Promise<SearchParams>;
 }) {
-  const { eventId } = await params;
-  const event = await detail<RaceEvent>("events", eventId);
-  const [circuit, sessions, seasons, query] = await Promise.all([
-    circuitDetail(event.circuit_id),
-    eventSessions(event.id),
-    getList<Season>("seasons"),
-    searchParams,
-  ]);
-  const season = seasons.find((row) => row.id === event.season_id);
-  if (
-    season &&
-    single(query.season) !== undefined &&
-    single(query.season) !== String(season.year)
-  )
-    notFound();
+  const [{ eventId }, query] = await Promise.all([params, searchParams]);
+  const { event, sessions, seasons, season, selected } = await raceContext(
+    eventId,
+    query,
+  );
   if (season && single(query.season) === undefined) {
     const canonical = new URLSearchParams({ season: String(season.year) });
     if (single(query.session)) canonical.set("session", single(query.session)!);
     redirect(`/races/${event.id}?${canonical}`);
   }
-  const selectedId = single(query.session);
-  const selected = selectedId
-    ? sessions.find((session) => session.id === selectedId)
-    : (sessions.find((session) => session.type === "race") ?? sessions[0]);
-  if (selectedId && !selected) notFound();
-  const results = selected ? await sessionResults(selected.id) : [];
+  const [circuit, results] = await Promise.all([
+    circuitDetail(event.circuit_id),
+    selected ? sessionResults(selected.id) : Promise.resolve([]),
+  ]);
   const names = await resultNames(results);
+  const replaySession =
+    selected && ["race", "sprint"].includes(selected.type)
+      ? selected
+      : (sessions.find((session) => session.type === "race") ??
+        sessions.find((session) => session.type === "sprint"));
   return (
     <>
       <Link
@@ -77,20 +69,32 @@ export default async function RacePage({
           action="/races"
         />
       </PageHeading>
-      <a className="back-link" href="#pitwall">
-        Ask Pitwall about this weekend
-      </a>
-      {sessions.find(
-        (session) => session.type === "race" && session.status === "completed",
-      ) && (
-        <Link
-          className="back-link"
-          href={`/strategy?${season ? `season=${season.year}&` : ""}event=${event.id}`}
-          prefetch={false}
-        >
-          Explore race strategy and tyres
-        </Link>
-      )}
+      <nav className="race-actions" aria-label="Race weekend actions">
+        <a className="back-link" href="#pitwall">
+          Ask Pitwall about this weekend
+        </a>
+        {replaySession && (
+          <Link
+            className="back-link"
+            href={replayHref(event.id, season?.year, replaySession.id)}
+            prefetch={false}
+          >
+            Open race replay
+          </Link>
+        )}
+        {sessions.find(
+          (session) =>
+            session.type === "race" && session.status === "completed",
+        ) && (
+          <Link
+            className="back-link"
+            href={`/strategy?${season ? `season=${season.year}&` : ""}event=${event.id}`}
+            prefetch={false}
+          >
+            Explore race strategy and tyres
+          </Link>
+        )}
+      </nav>
       <dl className="facts">
         <div>
           <dt>Season</dt>

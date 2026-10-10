@@ -32,6 +32,24 @@ Questions and retry controls remain available during temporary service failures.
 The Home page includes an optional, on-demand 3D car with a static fallback.
 Explicitly registered sessions can be finalized by the separate post-session worker.
 
+V2 Phase 3 adds `/races/[eventId]/replay`, linked from race/sprint detail, and
+`GET /v1/sessions/{session_id}/replay?max_samples=300` (32–600 samples per driver).
+This is a multi-driver **timing/order replay**, not a circuit or GPS reconstruction:
+the stored position records contain race rank only. Replay needs overlapping
+usable samples for at least two drivers from one source. Core results alone never
+enable replay. Gaps, missing drivers, provisional data and truncated context are
+labelled partial; recorded coverage may be shorter than the full session.
+Payloads contain at most 32 drivers, 600 position/interval points per driver,
+200 laps and 50 pits per driver, and 200 race-control messages. Sampling retains
+original timestamps/values, including endpoints; intermediate changes may be
+omitted. Playback holds the previous recorded rank for at most 30 seconds and
+labels that hold calculated, then marks it unavailable. Lap/pit windows use
+recorded starts and durations, with approximate lap starts labelled estimates.
+No coordinates, incidents or retirement times are inferred. Playback starts
+paused and fetches one snapshot, with no request per frame. Provisional snapshots
+can be refreshed using the existing session update control; worker finalization
+remains authoritative. No migration or new configuration is required.
+
 ## Planned V1
 
 - race weekends;

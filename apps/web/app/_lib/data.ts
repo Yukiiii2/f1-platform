@@ -25,6 +25,27 @@ export function seasonEvents(year: number) {
 export function eventSessions(id: string) {
   return getList<RaceSession>(`events/${id}/sessions`);
 }
+// Race detail and replay share UUID lookup, season validation and session scope.
+export async function raceContext(eventId: string, query: SearchParams) {
+  const event = await detail<RaceEvent>("events", eventId);
+  const [sessions, seasons] = await Promise.all([
+    eventSessions(event.id),
+    getList<Season>("seasons"),
+  ]);
+  const season = seasons.find((row) => row.id === event.season_id);
+  if (
+    season &&
+    single(query.season) !== undefined &&
+    single(query.season) !== String(season.year)
+  )
+    notFound();
+  const selectedId = single(query.session);
+  const selected = selectedId
+    ? sessions.find((session) => session.id === selectedId)
+    : (sessions.find((session) => session.type === "race") ?? sessions[0]);
+  if (selectedId && !selected) notFound();
+  return { event, sessions, seasons, season, selected };
+}
 export async function homeCalendar(events: RaceEvent[], now: Date) {
   const today = now.toISOString().slice(0, 10);
   const calendar: RaceEvent[] = [];

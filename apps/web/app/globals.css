@@ -240,6 +240,15 @@ input::placeholder {
   font-size: 0.875rem;
   color: var(--muted);
 }
+.race-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin-bottom: 1.5rem;
+}
+.race-actions .back-link {
+  margin-bottom: 0;
+}
 .home-toolbar {
   display: flex;
   justify-content: space-between;
