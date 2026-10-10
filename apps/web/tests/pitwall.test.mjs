@@ -602,3 +602,29 @@ test("unavailable answers provide no fabricated fallback facts", () => {
   assert.match(html, /Unavailable/);
   assert.doesNotMatch(html, /Source data|Calculated|72%|confirmed strategy/);
 });
+
+test("provisional Pitwall evidence remains labelled without implying final classification", () => {
+  const html = renderToStaticMarkup(
+    createElement(loadAnswer(), {
+      response: {
+        status: "answered",
+        facts: [grounded("/source/compound", "SOFT", "source")],
+        calculations: [
+          grounded("/derived/updates/0/live_enabled", true, "derived"),
+        ],
+        estimates: [],
+        interpretations: [],
+        unavailable: [],
+        evidence: [{ ...evidence, data_status: "provisional" }],
+      },
+      names: {},
+      prefix: "live",
+    }),
+  );
+  assert.match(html, /Provisional session data/);
+  assert.match(html, /does not establish a final classification/);
+  assert.doesNotMatch(
+    html,
+    /gemini|API key|driver_ids|live_cursor|Live enabled/,
+  );
+});

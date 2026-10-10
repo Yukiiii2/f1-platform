@@ -678,3 +678,73 @@ paid model call occurs in tests; retry/fallback behavior uses controlled transpo
 apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_phase8.py -v
 apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_gemini.py -v
 ```
+
+
+### Near-live session updates (V2 Phase 1)
+
+Stop workers before applying `alembic upgrade head`; migration
+`0007_near_live_updates` adds opt-in state to existing update jobs. No raw telemetry
+or F1 domain columns change. Existing registrations remain historical-only.
+
+OpenF1 live REST access requires a paid subscription and server-side
+`OPENF1_USERNAME` / `OPENF1_PASSWORD` in `apps/api/.env` (see the
+[official authentication guide](https://openf1.org/auth.html)). Tokens are renewed
+before hourly expiry; credentials and tokens are never returned by application APIs.
+Historical finalization remains unauthenticated and works without live access.
+
+From the repository root in PowerShell, reuse the existing domain UUIDs, source
+session key and driver mappings from the historical registration instructions:
+
+```powershell
+$env:PYTHONPATH = "apps/api"
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+apps/api/.venv/Scripts/python.exe -m app.workers --register --live --session $sessionId --source-session $sourceSession --driver "4=$norrisId" --driver "1=$verstappenId"
+apps/api/.venv/Scripts/python.exe -m app.workers --watch
+# In another terminal with the same PYTHONPATH:
+apps/api/.venv/Scripts/python.exe -m app.workers --status --session $sessionId
+Invoke-RestMethod "http://localhost:8000/v1/sessions/$sessionId/updates"
+```
+
+`--live` can enable an existing idle registration with the same immutable scope.
+Registration stays explicit: no calendar-wide discovery or automatic driver mapping.
+`SESSION_LIVE_POLL_SECONDS` (or `--live-poll-seconds`) is bounded to 60-300 seconds.
+The interval starts after each cycle's IO. A connection-owned PostgreSQL worker lock
+prevents overlapping workers and releases on crash. Requests are paced at 1.1s
+for authenticated live access (60/minute limit) and 2.1s for public historical
+access (30/minute limit), with at most three transient attempts and bounded
+Retry-After waits. Live registrations support up to 32 explicitly mapped drivers.
+
+An active session requires session-level start/resume/green evidence or recent
+source telemetry from a registered driver, within a six-hour window, not just a
+scheduled time. Recent samples never override a source stop/end/cancellation. Timed streams use a maximum five-minute
+catch-up window plus a two-minute overlap; the first observation covers the last
+two minutes. Mutable lap/stint summaries and race-control history are rechecked, retaining
+the source evidence used for detection. Repeated payloads produce
+no new raw revision or normalized payload rewrite; their ordering watermark still
+advances to prevent stale A-to-B-to-A restoration. Live row counts report changed rows.
+The cursor, revision ledger and normalized data commit atomically. Late corrections
+outside the overlap and missed earlier history remain provisional until the final
+full refresh. Empty collections/nulls remain explicit; no channels are fabricated.
+
+After three failed live cycles, live polling pauses (`live_suspended=true`) while
+historical finalization remains scheduled, with its own fresh retry budget. The
+last source end plus 30 minutes controls handoff; an unknown end uses a conservative
+six-hour window from the scheduled start. Both remain only scheduling hints: the
+original completion checks still decide finalization. `--retry --session $sessionId` re-enables
+bounded attempts; stop the watch process first, or retry when it releases the lock.
+Ctrl+C stops the local worker safely. Failed refreshes retain the last committed
+cursor and data; a replacement worker resumes without a partial commit.
+
+Session API responses add `updates`; `/v1/sessions/{id}/updates` returns only public
+operational metadata. Consumers must check `data_status` (`not_tracked`,
+`provisional`, `finalized`) alongside telemetry/lap data. Provisional records are
+never final classification: the results endpoint withholds classification while
+provisional. Pitwall evidence carries the same application-controlled status and
+retains existing aggregate usage/concurrency protection.
+
+Once the source is historical (30 minutes after the supplied end), the original
+completion-evidence/results/standings checks and **full** telemetry import run.
+Only a successful complete finalization changes the state to `finalized`; missing
+results or provider failures leave it provisional. Race, Telemetry and Strategy
+pages show that state and provide manual refresh. No WebSockets, client polling,
+automatic Pitwall calls, or live strategy intent/replay inference are introduced.

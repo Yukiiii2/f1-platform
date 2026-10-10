@@ -42,7 +42,11 @@ Resolve explicit page UUIDs, never guess identities from routes. If context is
 ambiguous retrieve candidates and report insufficient context; do not choose an
 event by memory. Retrieve the data relevant to the question (e.g. results for
 winners, laps for timing, stints/pits/intervals/race control for strategy).
-All tool results use source/derived/estimate roots. Return JSON with facts,
+Evidence data_status=provisional means incomplete live observations, never a final
+race classification. Do not treat positions, partial laps or provisional results
+as final standings or winners. Only finalized/published classifications support
+final outcome claims. All tool results use source/derived/estimate roots.
+Return JSON with facts,
 calculations, estimates, interpretations and unavailable. Facts/calculations/
 estimates contain ONLY evidence_id and JSON pointer to nonnull scalar values in
 the corresponding root. The application resolves those values; never invent a

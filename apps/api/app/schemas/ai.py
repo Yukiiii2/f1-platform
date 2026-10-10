@@ -54,6 +54,7 @@ class Evidence(Schema):
     arguments: dict[str, Any]
     status: Literal["available", "unavailable"]
     data: dict[str, Any] = Field(default_factory=dict)
+    data_status: Literal["not_tracked", "provisional", "finalized"] = "not_tracked"
     truncated: bool = False
     next_offset: int | None = None
     error: str | None = None

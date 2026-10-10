@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -31,6 +32,10 @@ class SessionUpdateJob(Entity, Base):
             "'failed', 'cancelled')",
             name="status",
         ),
+        CheckConstraint(
+            "data_status IN ('not_tracked', 'provisional', 'finalized')",
+            name="data_status",
+        ),
     )
 
     session_id: Mapped[UUID] = mapped_column(ForeignKey("sessions.id"))
@@ -55,3 +60,18 @@ class SessionUpdateJob(Entity, Base):
     derived_summary: Mapped[dict] = mapped_column(JSON, default=dict)
     cache_state: Mapped[dict] = mapped_column(JSON, default=dict)
     failure_details: Mapped[str | None] = mapped_column(String(100))
+    live_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    live_active: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    live_suspended: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    live_cursor: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    live_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    live_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    data_status: Mapped[str] = mapped_column(
+        String(20), default="not_tracked", server_default="not_tracked"
+    )

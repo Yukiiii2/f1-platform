@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app import models, schemas
 from app.db.session import get_db
+from app.schemas.domain import SessionUpdateRead
 from app.services import core
 
 router = APIRouter(tags=["core"])
@@ -79,17 +80,55 @@ def event(db: Database, event_id: UUID):
 @router.get("/events/{event_id}/sessions", response_model=list[schemas.SessionRead])
 def sessions(db: Database, event_id: UUID, limit: Limit = 50, offset: Offset = 0):
     require(db, models.Event, event_id)
-    return core.event_sessions(db, event_id, limit, offset)
+    rows = core.event_sessions(db, event_id, limit, offset)
+    jobs = (
+        {
+            job.session_id: job
+            for job in db.scalars(
+                select(models.SessionUpdateJob).where(
+                    models.SessionUpdateJob.session_id.in_([row.id for row in rows])
+                )
+            )
+        }
+        if rows
+        else {}
+    )
+    return [
+        schemas.SessionRead.model_validate(row).model_copy(
+            update={
+                "updates": SessionUpdateRead.model_validate(jobs[row.id])
+                if row.id in jobs
+                else None
+            }
+        )
+        for row in rows
+    ]
 
 
 @router.get("/sessions/{session_id}", response_model=schemas.SessionRead)
 def session(db: Database, session_id: UUID):
-    return require(db, models.Session, session_id)
+    row = require(db, models.Session, session_id)
+    return schemas.SessionRead.model_validate(row).model_copy(
+        update={"updates": session_updates(db, session_id)}
+    )
+
+
+@router.get("/sessions/{session_id}/updates", response_model=SessionUpdateRead)
+def session_updates(db: Database, session_id: UUID):
+    require(db, models.Session, session_id)
+    job = db.scalar(
+        select(models.SessionUpdateJob).where(
+            models.SessionUpdateJob.session_id == session_id
+        )
+    )
+    return SessionUpdateRead.model_validate(job) if job else SessionUpdateRead()
 
 
 @router.get("/sessions/{session_id}/results", response_model=list[schemas.ResultRead])
 def results(db: Database, session_id: UUID, limit: Limit = 50, offset: Offset = 0):
     require(db, models.Session, session_id)
+    if session_updates(db, session_id).data_status == "provisional":
+        return []
     return core.session_results(db, session_id, limit, offset)
 
 

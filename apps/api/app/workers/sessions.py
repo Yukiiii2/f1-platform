@@ -54,12 +54,16 @@ def worker_lock(engine):
                 connection.commit()
 
 
-def register_session(factory, session_id, source_session, driver_ids, *, now=None):
+def register_session(
+    factory, session_id, source_session, driver_ids, *, now=None, live=False
+):
     now = clock(now)
     if source_session < 1 or not driver_ids or any(number < 1 for number in driver_ids):
         raise ValueError(
             "Explicit positive source session and driver mappings are required"
         )
+    if live and len(driver_ids) > 32:
+        raise ValueError("Live scope supports at most 32 drivers")
     if len(set(driver_ids.values())) != len(driver_ids):
         raise ValueError("Driver mappings must be distinct")
     scope = {
@@ -81,6 +85,9 @@ def register_session(factory, session_id, source_session, driver_ids, *, now=Non
         if job:
             if job.source_session != source_session or job.driver_ids != scope:
                 raise ValueError("Registered source scope cannot be replaced")
+            if live and job.status not in {"succeeded", "cancelled"}:
+                job.live_enabled = True
+                job.next_attempt_at = now
             return job.id
         source_job = db.scalar(
             select(models.SessionUpdateJob).where(
@@ -103,6 +110,7 @@ def register_session(factory, session_id, source_session, driver_ids, *, now=Non
             source_session=source_session,
             driver_ids=scope,
             next_attempt_at=now,
+            live_enabled=live,
         )
         db.add(job)
         db.flush()
@@ -118,8 +126,14 @@ def retry_session(factory, session_id, *, now=None):
         )
         if job is None or job.status == "running":
             raise ValueError("No idle registered job to retry")
-        job.status, job.stage = "pending", "completion"
+        job.status, job.stage = (
+            "pending",
+            "live"
+            if job.live_enabled and job.stage in {"live", "waiting"}
+            else "completion",
+        )
         job.consecutive_failures = 0
+        job.live_suspended = False
         job.next_attempt_at = clock(now)
         job.failure_details = None
 
@@ -331,6 +345,8 @@ def finalize(factory, job, core, telemetry, now, interval, invalidate):
             finished_at=clock(),
             cache_state=cache_state,
             failure_details=None,
+            data_status="finalized",
+            live_active=False,
         )
         logger.info(
             "Session update job=%s status=succeeded elapsed_seconds=%.1f counts=%s",
@@ -369,12 +385,191 @@ def finalize(factory, job, core, telemetry, now, interval, invalidate):
         )
 
 
+def refresh_live(factory, job, telemetry, now, interval):
+    """Return False only when the historical finalization path should take over."""
+    started = time.monotonic()
+    with factory() as db:
+        session = db.get(models.Session, job.session_id)
+        event = db.get(models.Event, session.event_id)
+        scheduled = session.starts_at or (
+            datetime.combine(session.scheduled_date, datetime.min.time(), timezone.utc)
+            if session.scheduled_date
+            else None
+        )
+        if (
+            job.stage
+            in {
+                "core",
+                "completion",
+                "telemetry",
+                "derived",
+                "cache",
+                "results",
+                "failed",
+            }
+            and job.attempt_count > 0
+        ):
+            return False
+        # Old/completed jobs use the original public historical API without live auth.
+        if session.status == SessionStatus.COMPLETED or (
+            scheduled and utc(scheduled) + timedelta(days=1) <= now
+        ):
+            return False
+        if scheduled and utc(scheduled) - timedelta(minutes=30) > now:
+            stage(
+                factory,
+                job.id,
+                "waiting",
+                status="pending",
+                next_attempt_at=utc(scheduled) - timedelta(minutes=30),
+            )
+            return True
+        year = db.get(models.Season, event.season_id).year
+        country = db.get(models.Circuit, event.circuit_id).country
+        country = {
+            "USA": "United States",
+            "UK": "United Kingdom",
+            "UAE": "United Arab Emirates",
+        }.get(country, country)
+        expected_date = session.scheduled_date or (
+            utc(session.starts_at).date() if session.starts_at else None
+        )
+    if job.live_suspended:
+        # Last source end is only a handoff hint; historical completion still
+        # requires its original evidence checks. Unknown ends use a bounded window.
+        ready_at = (
+            utc(job.live_ends_at) + timedelta(minutes=30)
+            if job.live_ends_at
+            else utc(scheduled) + timedelta(hours=6)
+            if scheduled
+            else now
+        )
+        if now >= ready_at:
+            return False
+        stage(
+            factory,
+            job.id,
+            "waiting",
+            status="pending",
+            next_attempt_at=min(ready_at, now + timedelta(minutes=30)),
+        )
+        return True
+    try:
+        stage(
+            factory,
+            job.id,
+            "live",
+            status="running",
+            started_at=now,
+            attempt_count=job.attempt_count + 1,
+            failure_details=None,
+        )
+        proof = telemetry.inspect_live_session(
+            job.source_session, now, sorted(int(number) for number in job.driver_ids)
+        )
+        if (
+            proof.year != year
+            or proof.session_type != session.type
+            or proof.country.casefold() != country.casefold()
+            or (proof.starts_at is None and not proof.cancelled)
+            or (proof.starts_at is not None and proof.starts_at.date() != expected_date)
+        ):
+            raise ValueError("Source live session does not match registered scope")
+        stage(
+            factory,
+            job.id,
+            "live",
+            live_ends_at=proof.ends_at,
+            live_active=proof.active,
+        )
+        if proof.cancelled:
+            # Terminal job and public state must commit together, preserving the
+            # provisional observations already imported before cancellation.
+            with factory.begin() as db:
+                db.get(models.Session, job.session_id).status = SessionStatus.CANCELLED
+                stored = db.get(models.SessionUpdateJob, job.id)
+                stored.stage, stored.status = "cancelled", "cancelled"
+                stored.finished_at = now
+                stored.failure_details = "source_cancelled"
+                stored.live_active, stored.live_suspended = False, False
+                stored.consecutive_failures = 0
+            logger.info("Session update job=%s stage=cancelled", job.id)
+            return True
+        if proof.settled:
+            return False
+        if proof.active:
+            run_telemetry_import(
+                telemetry,
+                factory,
+                job.session_id,
+                job.source_session,
+                {
+                    int(number): UUID(driver)
+                    for number, driver in job.driver_ids.items()
+                },
+                live_job_id=job.id,
+                now=now,
+            )
+        # Poll interval starts after IO, preventing catch-up bursts and tight loops.
+        stage(
+            factory,
+            job.id,
+            "live" if proof.active else "waiting",
+            status="pending",
+            consecutive_failures=0,
+            failure_details=None,
+            next_attempt_at=now
+            + timedelta(seconds=interval + time.monotonic() - started),
+        )
+    except Exception as error:
+        failures = job.consecutive_failures + 1
+        suspended = failures >= MAX_FAILURES
+        category = (
+            "validation_failed"
+            if isinstance(error, ValueError)
+            else "dependency_failed"
+        )
+        stage(
+            factory,
+            job.id,
+            "waiting" if suspended else "live",
+            status="pending" if suspended else "retry",
+            live_suspended=suspended,
+            live_active=False,
+            consecutive_failures=failures,
+            failure_details=f"live:{category}",
+            next_attempt_at=now
+            + timedelta(
+                seconds=(1800 if suspended else interval * 2 ** (failures - 1))
+                + time.monotonic()
+                - started
+            ),
+        )
+        logger.warning(
+            "Live update job=%s failures=%d suspended=%s category=%s",
+            job.id,
+            failures,
+            suspended,
+            category,
+        )
+    return True
+
+
 def run_once(
-    factory, core, telemetry, *, now=None, interval=POLL_SECONDS, invalidate=None
+    factory,
+    core,
+    telemetry,
+    *,
+    now=None,
+    interval=POLL_SECONDS,
+    live_interval=60,
+    invalidate=None,
 ):
     now = clock(now)
     if interval < 900:
         raise ValueError("Post-session polling interval must be at least 900 seconds")
+    if not 60 <= live_interval <= 300:
+        raise ValueError("Live polling interval must be between 60 and 300 seconds")
     engine = factory.kw["bind"]
     with worker_lock(engine) as acquired:
         if not acquired:
@@ -398,6 +593,20 @@ def run_once(
             )
         core_context = core, {}
         for job in jobs:
+            if job.live_enabled and refresh_live(
+                factory, job, telemetry, now, live_interval
+            ):
+                continue
+            if job.live_enabled and job.stage in {"live", "waiting"}:
+                # Live and authoritative historical attempts have separate budgets.
+                job.consecutive_failures = 0
+                stage(
+                    factory,
+                    job.id,
+                    "completion",
+                    consecutive_failures=0,
+                    live_active=False,
+                )
             finalize(
                 factory,
                 job,

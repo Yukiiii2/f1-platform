@@ -32,11 +32,12 @@ class TelemetryBundle:
     year: int
     session_type: SessionType
     starts_at: datetime
-    ends_at: datetime
+    ends_at: datetime | None
     country: str
     driver_codes: dict[int, str | None]
     source_updated_at: datetime | None = None
     observation_started_at: datetime | None = None
+    cursor: dict[str, str] | None = None
 
 
 class TelemetryProvider(Protocol):
@@ -59,3 +60,4 @@ class SessionCompletion:
     cancelled: bool = False
     evidence_kind: str | None = None
     observed_at: datetime | None = None
+    active: bool = False

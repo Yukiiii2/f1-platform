@@ -24,6 +24,7 @@ export interface Evidence {
   arguments: Record<string, Json>;
   status: "available" | "unavailable";
   data: Record<string, Json>;
+  data_status?: "not_tracked" | "provisional" | "finalized";
   truncated: boolean;
   next_offset: number | null;
   error: string | null;

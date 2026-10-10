@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SessionUpdates } from "../../_components/session-updates";
 import { Pitwall } from "../../_components/pitwall";
 import { suggestedQuestions } from "../../_lib/pitwall";
 import { notFound } from "next/navigation";
@@ -145,6 +146,7 @@ export default async function RacePage({
             <Status value={selected.status} />
           </div>
         )}
+        {selected && <SessionUpdates session={selected} />}
         {results.length > 0 && selected ? (
           <>
             <ResultsTable

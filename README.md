@@ -4,7 +4,7 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 12 — production-readiness remediation of the implemented application.
+V1 Phase 0-12 foundation with V2 Phase 1 near-live session updates.
 Web and API run independently.
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,
@@ -177,7 +177,13 @@ The separate worker checks registered sessions every 30 minutes by default and
 requires historical settling and completion evidence before finalization. It
 refreshes available core data, imports telemetry, and records job status with
 bounded retries; PostgreSQL prevents overlapping workers. Stop with Ctrl+C.
-This is post-session scheduling, not live timing or automatic session discovery.
+Historical-only registration remains the default. V2 Phase 1 optionally enables
+near-live refresh with `--register --live`, authenticated OpenF1 access, and bounded
+60?300 second polling. Live observations remain provisional until the full
+post-session finalization succeeds. Race, Telemetry and Strategy pages label the
+state and offer manual refresh; Pitwall preserves provisional evidence labels.
+See [near-live setup and limitations](apps/api/README.md#near-live-session-updates-v2-phase-1).
+Session discovery and driver mapping remain explicit.
 
 ### Pitwall admission protection
 

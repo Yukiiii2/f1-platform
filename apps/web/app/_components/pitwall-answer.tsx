@@ -77,6 +77,12 @@ export function PitwallAnswer({
   );
   return (
     <div className="pitwall-answer">
+      {response.evidence.some((row) => row.data_status === "provisional") && (
+        <p className="pitwall-note">
+          Provisional session data: observations may be incomplete or corrected.
+          This answer does not establish a final classification.
+        </p>
+      )}
       {values("Source data", response.facts, "source")}
       {values("Calculated", response.calculations, "derived")}
       {hasDelta && (

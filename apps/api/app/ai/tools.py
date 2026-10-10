@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from pydantic import AwareDatetime, Field, ValidationError
+from sqlalchemy import select
 
 from app import models, schemas
 from app.ai.client import strict_schema
@@ -385,6 +386,39 @@ class ToolExecutor:
             evidence.error = "approximate_opt_in_required"
             return evidence
         args = parsed.model_dump()
+        session_ids = {
+            identifier
+            for identifier in (args.get("session_id"), self.context.session_id)
+            if identifier
+        }
+        for key, model in (
+            ("lap_id", models.Lap),
+            ("lap_a_id", models.Lap),
+            ("lap_b_id", models.Lap),
+            ("stint_id", models.Stint),
+        ):
+            if args.get(key):
+                row = self.db.get(model, args[key])
+                if row:
+                    session_ids.add(row.session_id)
+        states = (
+            set(
+                self.db.scalars(
+                    select(models.SessionUpdateJob.data_status).where(
+                        models.SessionUpdateJob.session_id.in_(session_ids)
+                    )
+                )
+            )
+            if session_ids
+            else set()
+        )
+        evidence.data_status = (
+            "provisional"
+            if "provisional" in states
+            else "finalized"
+            if states == {"finalized"}
+            else "not_tracked"
+        )
         paged = isinstance(parsed, Page)
         if paged:
             args["limit"] += 1
@@ -418,7 +452,27 @@ class ToolExecutor:
             value = (tool.dto.model_validate(value) if tool.dto else value).model_dump(
                 mode="json"
             )
-        data = classify(name, value)
+        if name in {"get_session", "get_sessions"}:
+            rows = value if isinstance(value, list) else [value]
+            if any(
+                row.get("updates") and row["updates"]["data_status"] == "provisional"
+                for row in rows
+            ):
+                evidence.data_status = "provisional"
+            # Operational update state is application metadata, not an F1 source fact.
+            updates = []
+            session_status = []
+            for row in rows:
+                update = row.pop("updates", None)
+                updates.append(update)
+                if update and update["data_status"] == "provisional":
+                    session_status.append(
+                        {"session_id": row["id"], "status": row.pop("status")}
+                    )
+            data = classify(name, value)
+            data["derived"] = {"updates": updates, "session_status": session_status}
+        else:
+            data = classify(name, value)
         if len(json.dumps(data)) > 120000:
             evidence.error = "result_too_large_use_narrower_query"
             return evidence

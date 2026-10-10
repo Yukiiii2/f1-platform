@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SessionUpdates } from "../_components/session-updates";
 import { Pitwall } from "../_components/pitwall";
 import { suggestedQuestions } from "../_lib/pitwall";
 import { notFound } from "next/navigation";
@@ -82,6 +83,7 @@ export default async function StrategyPage({ searchParams }: SearchPageProps) {
           Ask Pitwall about this race
         </a>
       )}
+      {race && <SessionUpdates session={race} />}
       {!season ? (
         <NoSeason />
       ) : (

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { SessionUpdates } from "../_components/session-updates";
 import { Pitwall } from "../_components/pitwall";
 import { suggestedQuestions } from "../_lib/pitwall";
 import { ApiError, getList, postEntity } from "../_lib/api";
@@ -91,6 +92,7 @@ export default async function TelemetryPage({ searchParams }: SearchPageProps) {
           Ask Pitwall about this session
         </a>
       )}
+      {session && <SessionUpdates session={session} />}
       {!season ? (
         <NoSeason />
       ) : (

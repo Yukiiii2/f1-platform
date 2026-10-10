@@ -39,7 +39,15 @@ export type SessionStatus =
   | "completed"
   | "delayed"
   | "cancelled";
+export interface SessionUpdate {
+  data_status: "not_tracked" | "provisional" | "finalized";
+  live_enabled: boolean;
+  live_suspended: boolean;
+  live_active: boolean;
+  live_updated_at: string | null;
+}
 export interface RaceSession extends Entity, Schedule {
+  updates?: SessionUpdate | null;
   event_id: string;
   type: SessionType;
   status: SessionStatus;

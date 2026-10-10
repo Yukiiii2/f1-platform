@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -90,8 +90,16 @@ class SessionCreate(TimeWindow):
     status: SessionStatus = SessionStatus.UNKNOWN
 
 
+class SessionUpdateRead(Schema):
+    data_status: Literal["not_tracked", "provisional", "finalized"] = "not_tracked"
+    live_enabled: bool = False
+    live_suspended: bool = False
+    live_active: bool = False
+    live_updated_at: AwareDatetime | None = None
+
+
 class SessionRead(SessionCreate, ReadFields):
-    pass
+    updates: SessionUpdateRead | None = None
 
 
 class DriverCreate(Schema):

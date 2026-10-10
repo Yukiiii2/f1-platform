@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class OpenF1Provider:
-    """Explicit historical imports. No authentication, polling, or live access."""
+    """Historical imports and opt-in authenticated incremental observations."""
 
     name = "openf1"
     base_url = "https://api.openf1.org/v1/"
@@ -30,11 +30,18 @@ class OpenF1Provider:
         self,
         client: httpx.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        *,
+        username: str | None = None,
+        password: str | None = None,
     ):
         self.client = client or httpx.Client(timeout=60)
         self.owns_client = client is None
         self.sleep = sleep
         self.last_request = 0.0
+        self.username, self.password = username, password
+        self._token = None
+        self._token_expires = 0.0
+        self._live_observation = None
 
     def __enter__(self):
         return self
@@ -43,16 +50,43 @@ class OpenF1Provider:
         if self.owns_client:
             self.client.close()
 
-    def _request(self, endpoint, params, allow_empty=False):
+    def _authorization(self):
+        if not self.username or not self.password:
+            raise ProviderError("OpenF1 live access is not configured")
+        if self._token and time.monotonic() < self._token_expires:
+            return {"Authorization": f"Bearer {self._token}"}
+        try:
+            response = self.client.post(
+                "https://api.openf1.org/token",
+                data={"username": self.username, "password": self.password},
+            )
+            if response.status_code != 200:
+                raise ProviderError(
+                    f"OpenF1 authentication HTTP {response.status_code}"
+                )
+            body = response.json()
+            token, lifetime = body["access_token"], int(body["expires_in"])
+            if not isinstance(token, str) or not token or lifetime <= 60:
+                raise ValueError
+        except (httpx.RequestError, ValueError, KeyError, TypeError):
+            raise ProviderError("OpenF1 authentication unavailable") from None
+        self._token, self._token_expires = token, time.monotonic() + lifetime - 60
+        return {"Authorization": f"Bearer {token}"}
+
+    def _request(self, endpoint, params, allow_empty=False, *, live=False):
         for attempt in range(3):
-            # Free tier: 3/s and 30/min. 2.1 seconds also leaves minute-window headroom.
-            self.sleep(max(0, 2.1 - (time.monotonic() - self.last_request)))
+            # Historical: 30/min. Authenticated live: 60/min; leave headroom.
+            spacing = 1.1 if live else 2.1
+            self.sleep(max(0, spacing - (time.monotonic() - self.last_request)))
             self.last_request = time.monotonic()
             try:
                 response = self.client.get(
                     self.base_url + endpoint,
                     params=params,
-                    headers={"User-Agent": "F1IntelligencePlatform/0.4.0"},
+                    headers={
+                        "User-Agent": "F1IntelligencePlatform/0.4.0",
+                        **(self._authorization() if live else {}),
+                    },
                 )
             except httpx.RequestError:
                 logger.warning(
@@ -153,6 +187,216 @@ class OpenF1Provider:
             )
         except (ValueError, TypeError, KeyError) as error:
             raise ProviderError("OpenF1 data is incomplete or inconsistent") from error
+
+    def inspect_live_session(
+        self, source_session: int, now: datetime, drivers: list[int] | None = None
+    ) -> SessionCompletion:
+        """Active status requires source signals, never the scheduled clock alone."""
+        if source_session < 1 or now.tzinfo is None or now.utcoffset() is None:
+            raise ValueError("Positive source session and aware clock are required")
+        if drivers is not None and (
+            not drivers or len(drivers) > 32 or any(number < 1 for number in drivers)
+        ):
+            raise ValueError("Live scope requires 1-32 positive driver numbers")
+        self._live_observation = None
+        try:
+            params = {"session_key": source_session}
+            metadata = self._request("sessions", params, live=True)
+            if len(metadata) != 1 or metadata[0]["session_key"] != source_session:
+                raise ValueError
+            row = metadata[0]
+            cancelled = row.get("is_cancelled", False)
+            start = timestamp(row["date_start"]) if row.get("date_start") else None
+            end = timestamp(row["date_end"]) if row.get("date_end") else None
+            if (
+                not isinstance(cancelled, bool)
+                or (not cancelled and start is None)
+                or (start and end and end < start)
+            ):
+                raise ValueError
+            context = dict(
+                year=int(row["year"]),
+                session_type=SESSION_TYPES[row["session_name"]],
+                starts_at=start,
+                ends_at=end,
+                country=row["country_name"],
+                settled=bool(end and end + timedelta(minutes=30) <= now),
+            )
+            if cancelled:
+                return SessionCompletion(**context, cancelled=True)
+            # Bound detection so ancient starts cannot keep polling forever.
+            if now < start or now > start + timedelta(hours=6):
+                return SessionCompletion(**context)
+            signals = self._request("race_control", params, allow_empty=True, live=True)
+            statuses = []
+            qualifying = context["session_type"] in {
+                SessionType.QUALIFYING,
+                SessionType.SPRINT_QUALIFYING,
+            }
+            for signal in signals:
+                if signal["session_key"] != source_session:
+                    raise ValueError
+                observed = timestamp(signal["date"])
+                if (
+                    not start <= observed <= now
+                    or signal.get("driver_number") is not None
+                ):
+                    continue
+                message = signal.get("message", "").strip().upper()
+                if signal.get("category") == "SessionStatus":
+                    # Q1/Q2 ends do not finalize the full qualifying session.
+                    if (
+                        message == "SESSION ENDED"
+                        and qualifying
+                        and signal.get("qualifying_phase") != 3
+                    ):
+                        message = "PHASE ENDED"
+                    statuses.append((observed, message))
+                elif message == "GREEN LIGHT - PIT EXIT OPEN":
+                    statuses.append((observed, "SESSION STARTED"))
+                elif (
+                    signal.get("flag") == "CHEQUERED"
+                    and signal.get("scope") == "Track"
+                    and (not qualifying or signal.get("qualifying_phase") == 3)
+                ):
+                    statuses.append((observed, "SESSION ENDED"))
+            latest = max(statuses) if statuses else None
+            active = bool(
+                latest
+                and latest[1]
+                in {"SESSION STARTED", "SESSION RESUMED", "SESSION RESTARTED"}
+            )
+            cancelled = bool(latest and latest[1] == "SESSION CANCELLED")
+            if (
+                not active
+                and not cancelled
+                and drivers
+                and (
+                    latest is None
+                    or latest[1]
+                    not in {
+                        "SESSION ENDED",
+                        "SESSION STOPPED",
+                        "SESSION ABORTED",
+                        "PHASE ENDED",
+                    }
+                )
+            ):
+                # Some sessions lack start messages. Recent source telemetry can
+                # prove activity, but cannot override a stop/end/cancellation.
+                for number in sorted(set(drivers)):
+                    recent = self._request(
+                        "car_data",
+                        {
+                            **params,
+                            "driver_number": number,
+                            "date>=": max(
+                                start, now - timedelta(seconds=120)
+                            ).isoformat(),
+                            "date<=": now.isoformat(),
+                        },
+                        allow_empty=True,
+                        live=True,
+                    )
+                    for sample in recent:
+                        if (
+                            sample["session_key"] != source_session
+                            or sample["driver_number"] != number
+                        ):
+                            raise ValueError
+                        if (
+                            max(start, now - timedelta(seconds=120))
+                            <= timestamp(sample["date"])
+                            <= now
+                        ):
+                            active = True
+                    if active:
+                        break
+            if active:
+                context["settled"] = False
+            self._live_observation = (source_session, now, metadata, signals)
+            return SessionCompletion(
+                **context,
+                active=active,
+                cancelled=cancelled,
+                observed_at=latest[0] if latest else None,
+            )
+        except (ValueError, TypeError, KeyError, AttributeError):
+            raise ProviderError("OpenF1 live session metadata is invalid") from None
+
+    def fetch_incremental(
+        self, source_session: int, drivers: list[int], cursor: dict, now: datetime
+    ):
+        """Bounded time windows with overlap; small mutable summaries are rechecked.
+
+        Only finalization fetches the complete history. Late corrections outside the
+        overlap are intentionally provisional until that authoritative full refresh.
+        """
+        observation_started = datetime.now(timezone.utc)
+        observation = self._live_observation
+        if observation is None or observation[:2] != (source_session, now):
+            raise ProviderError("A current live session inspection is required")
+        _, _, metadata, signals = observation
+        params = {"session_key": source_session}
+        start = timestamp(metadata[0]["date_start"])
+        previous = (
+            timestamp(cursor["through"])
+            if cursor.get("through")
+            else max(start, now - timedelta(seconds=120))
+        )
+        if previous > now:
+            raise ProviderError("Live cursor is ahead of the observation clock")
+        through = min(now, previous + timedelta(seconds=300))
+        lower = (
+            max(start, previous - timedelta(seconds=120))
+            if cursor.get("through")
+            else previous
+        )
+        window = {"date>=": lower.isoformat(), "date<=": through.isoformat()}
+        data = {
+            "sessions": metadata,
+            "drivers": self._request("drivers", params, live=True),
+        }
+        for endpoint in KINDS:
+            data[endpoint] = []
+            if endpoint == "race_control":
+                data[endpoint] = [
+                    row for row in signals if timestamp(row["date"]) <= now
+                ]
+            elif endpoint == "weather":
+                data[endpoint] = self._request(
+                    endpoint, {**params, **window}, allow_empty=True, live=True
+                )
+            else:
+                for number in sorted(set(drivers)):
+                    data[endpoint].extend(
+                        self._request(
+                            endpoint,
+                            {
+                                **params,
+                                "driver_number": number,
+                                **({} if endpoint in {"laps", "stints"} else window),
+                            },
+                            allow_empty=True,
+                            live=True,
+                        )
+                    )
+        try:
+            return replace(
+                normalize(
+                    data,
+                    source_session,
+                    drivers,
+                    datetime.now(timezone.utc),
+                    provisional=True,
+                ),
+                observation_started_at=observation_started,
+                cursor={"through": through.isoformat()},
+            )
+        except (ValueError, TypeError, KeyError):
+            raise ProviderError(
+                "OpenF1 live data is incomplete or inconsistent"
+            ) from None
 
     def inspect_session(self, source_session: int, now: datetime) -> SessionCompletion:
         """Low-frequency historical completion check; date_end alone is not proof."""

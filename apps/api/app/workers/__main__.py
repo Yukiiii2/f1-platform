@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app import models
+from app.core.config import get_settings
 from app.db.session import get_engine, get_session_factory
 from app.providers.jolpica import JolpicaProvider
 from app.providers.openf1 import OpenF1Provider
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Historical post-session updates, not real-time timing"
+        description="Historical finalization and opt-in provisional near-live updates"
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--register", action="store_true")
@@ -41,7 +42,15 @@ def main():
     )
     parser.add_argument("--driver", action="append", default=[], metavar="NUMBER=UUID")
     parser.add_argument("--poll-seconds", type=int, default=POLL_SECONDS)
+    parser.add_argument(
+        "--live", action="store_true", help="Enable near-live refresh on registration"
+    )
+    parser.add_argument("--live-poll-seconds", type=int, default=None)
     args = parser.parse_args()
+    if args.live and not args.register:
+        parser.error("--live is only supported with --register")
+    if args.live_poll_seconds is not None and not 60 <= args.live_poll_seconds <= 300:
+        parser.error("--live-poll-seconds must be between 60 and 300")
     if args.poll_seconds < 900:
         parser.error("--poll-seconds must be at least 900 (default: 1800)")
     if (args.register or args.retry) and args.session is None:
@@ -75,6 +84,12 @@ def main():
                                 "next_attempt_at": job.next_attempt_at.isoformat(),
                                 "row_counts": job.row_counts,
                                 "failure_category": job.failure_details,
+                                "live_enabled": job.live_enabled,
+                                "live_suspended": job.live_suspended,
+                                "data_status": job.data_status,
+                                "live_updated_at": job.live_updated_at.isoformat()
+                                if job.live_updated_at
+                                else None,
                             }
                         )
                     )
@@ -96,14 +111,36 @@ def main():
                             raise ValueError("Duplicate driver mapping")
                         drivers[number] = UUID(identifier)
                     identifier = register_session(
-                        factory, args.session, args.source_session, drivers
+                        factory,
+                        args.session,
+                        args.source_session,
+                        drivers,
+                        live=args.live,
                     )
                     print(f"Session update registered: {identifier}")
             return 0
-        with JolpicaProvider() as core, OpenF1Provider() as telemetry:
+        settings = get_settings()
+        live_interval = args.live_poll_seconds or settings.session_live_poll_seconds
+        with (
+            JolpicaProvider() as core,
+            OpenF1Provider(
+                username=settings.openf1_username.get_secret_value()
+                if settings.openf1_username
+                else None,
+                password=settings.openf1_password.get_secret_value()
+                if settings.openf1_password
+                else None,
+            ) as telemetry,
+        ):
             while True:
                 try:
-                    run_once(factory, core, telemetry, interval=args.poll_seconds)
+                    run_once(
+                        factory,
+                        core,
+                        telemetry,
+                        interval=args.poll_seconds,
+                        live_interval=live_interval,
+                    )
                 except Exception:
                     # Connection/provider exceptions may contain private configuration.
                     logger.error(
@@ -113,7 +150,7 @@ def main():
                         return 1
                 if args.once:
                     return 0
-                time.sleep(args.poll_seconds)
+                time.sleep(min(args.poll_seconds, live_interval))
     except KeyboardInterrupt:
         return 0
     except Exception:

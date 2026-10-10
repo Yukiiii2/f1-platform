@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     )
 
     database_url: PostgresDsn | None = Field(default=None, repr=False)
+    openf1_username: SecretStr | None = Field(default=None, repr=False)
+    openf1_password: SecretStr | None = Field(default=None, repr=False)
+    session_live_poll_seconds: int = Field(default=60, ge=60, le=300)
     openai_api_key: SecretStr | None = Field(default=None, repr=False)
     gemini_api_key: SecretStr | None = Field(default=None, repr=False)
     pitwall_provider: Literal["openai", "gemini"] = "openai"

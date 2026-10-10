@@ -75,16 +75,18 @@ def gap(value):
     return number(value), None
 
 
-def normalize(data, source_session, drivers, fetched_at):
+def normalize(data, source_session, drivers, fetched_at, *, provisional=False):
     sessions = data["sessions"]
     if len(sessions) != 1 or sessions[0]["session_key"] != source_session:
         raise ValueError("Expected one matching source session")
     metadata = sessions[0]
     starts_at, ends_at = (
         timestamp(metadata["date_start"]),
-        timestamp(metadata["date_end"]),
+        timestamp(metadata["date_end"])
+        if metadata.get("date_end") is not None or not provisional
+        else None,
     )
-    if ends_at < starts_at or metadata.get("is_cancelled"):
+    if (ends_at is not None and ends_at < starts_at) or metadata.get("is_cancelled"):
         raise ValueError("Session is cancelled or has invalid boundaries")
     codes = {}
     for row in data["drivers"]:

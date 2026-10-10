@@ -141,6 +141,8 @@ def persist_session_bundle(
     source_session: int,
     driver_ids: dict[int, UUID],
     bundle: TelemetryBundle,
+    *,
+    changed_only: bool = False,
 ) -> dict[str, int]:
     observed_at = bundle.observation_started_at or bundle.fetched_at
     if observed_at.tzinfo is None or observed_at.utcoffset() is None:
@@ -160,28 +162,63 @@ def persist_session_bundle(
     counts = {kind: 0 for kind in ENTITIES}
     for kind, records in grouped.items():
         model, schema = ENTITIES[kind]
-        existing = {
-            row.source_key: row
-            for row in db.scalars(
-                select(model).where(
-                    model.provider == provider,
-                    model.session_id == session_id,
+        existing = (
+            {}
+            if changed_only
+            else {
+                row.source_key: row
+                for row in db.scalars(
+                    select(model).where(
+                        model.provider == provider,
+                        model.session_id == session_id,
+                    )
                 )
-            )
-        }
+            }
+        )
         source = models.TelemetrySourceRecord
-        revisions = {
-            (key, checksum): identifier
-            for key, checksum, identifier in db.execute(
-                select(source.source_key, source.checksum, source.id).where(
-                    source.provider == provider,
-                    source.session_id == session_id,
-                    source.kind == kind,
+        revisions = (
+            {}
+            if changed_only
+            else {
+                (key, checksum): identifier
+                for key, checksum, identifier in db.execute(
+                    select(source.source_key, source.checksum, source.id).where(
+                        source.provider == provider,
+                        source.session_id == session_id,
+                        source.kind == kind,
+                    )
                 )
-            )
-        }
+            }
+        )
         seen = set()
         for start in range(0, len(records), 500):
+            if changed_only:
+                keys = [record.source_key for record in records[start : start + 500]]
+                existing.update(
+                    {
+                        row.source_key: row
+                        for row in db.scalars(
+                            select(model).where(
+                                model.provider == provider,
+                                model.session_id == session_id,
+                                model.source_key.in_(keys),
+                            )
+                        )
+                    }
+                )
+                revisions.update(
+                    {
+                        (key, checksum): identifier
+                        for key, checksum, identifier in db.execute(
+                            select(source.source_key, source.checksum, source.id).where(
+                                source.provider == provider,
+                                source.session_id == session_id,
+                                source.kind == kind,
+                                source.source_key.in_(keys),
+                            )
+                        )
+                    }
+                )
             prepared = []
             for record in records[start : start + 500]:
                 if record.source_key in seen:
@@ -245,8 +282,15 @@ def persist_session_bundle(
                             else current
                         )
                         if observed_at <= current:
-                            counts[kind] += 1
+                            if not changed_only:
+                                counts[kind] += 1
                             continue
+                    if changed_only and row.source_record_id == revision:
+                        # A repeated payload is not re-imported. Advance only its
+                        # ordering watermark: otherwise a delayed A->B->A import
+                        # could overwrite this newer observation with stale B.
+                        row.source_observed_at = observed_at
+                        continue
                     for field, value in data.items():
                         setattr(row, field, value)
                 counts[kind] += 1
@@ -260,6 +304,9 @@ def run_telemetry_import(
     session_id: UUID,
     source_session: int,
     driver_ids: dict[int, UUID],
+    *,
+    live_job_id: UUID | None = None,
+    now: datetime | None = None,
 ) -> UUID:
     if source_session < 1 or not driver_ids or any(number < 1 for number in driver_ids):
         raise ValueError(
@@ -287,7 +334,21 @@ def run_telemetry_import(
         run_id = run.id
     bundle, attempt = None, 1
     try:
-        bundle = provider.fetch_session(source_session, sorted(driver_ids))
+        if live_job_id is None:
+            bundle = provider.fetch_session(source_session, sorted(driver_ids))
+        else:
+            with factory() as db:
+                job = db.get(models.SessionUpdateJob, live_job_id)
+                if (
+                    job is None
+                    or job.session_id != session_id
+                    or job.source_session != source_session
+                ):
+                    raise ValueError("Live job scope mismatch")
+                cursor = job.live_cursor
+            bundle = provider.fetch_incremental(
+                source_session, sorted(driver_ids), cursor, now
+            )
         while True:
             try:
                 with factory.begin() as db:
@@ -298,6 +359,7 @@ def run_telemetry_import(
                         source_session,
                         driver_ids,
                         bundle,
+                        changed_only=live_job_id is not None,
                     )
                     run = db.get(models.ImportRun, run_id)
                     run.status = "succeeded"
@@ -306,6 +368,18 @@ def run_telemetry_import(
                     run.source_updated_at = bundle.source_updated_at
                     run.finished_at = datetime.now(timezone.utc)
                     run.attempt_count = attempt
+                    if live_job_id is not None:
+                        job = db.get(models.SessionUpdateJob, live_job_id)
+                        if bundle.cursor is None:
+                            raise ValueError("Live refresh requires a validated cursor")
+                        # Same transaction as raw revisions and normalized rows.
+                        job.live_cursor = bundle.cursor
+                        job.live_updated_at = bundle.fetched_at
+                        job.data_status = "provisional"
+                        job.telemetry_import_id = run_id
+                        job.row_counts = counts
+                        session = db.get(models.Session, session_id)
+                        session.status = "in_progress"
                 logger.info(
                     "Telemetry import %s succeeded: provider=%s counts=%s",
                     run_id,

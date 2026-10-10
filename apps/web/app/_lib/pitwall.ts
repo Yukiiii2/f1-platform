@@ -271,7 +271,7 @@ export function displayValue(row: GroundedValue): boolean {
   return !row.pointer
     .split("/")
     .some((key) =>
-      /^(provider|id|.*_id|.*version|classification|policy|api_key|model|prompt|source_revision.*|raw.*)$/.test(
+      /^(provider|updates|session_status|live_.*|data_status|id|.*_id|.*version|classification|policy|api_key|model|prompt|source_revision.*|raw.*)$/.test(
         key,
       ),
     );
