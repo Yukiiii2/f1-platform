@@ -36,6 +36,7 @@ class TelemetryBundle:
     country: str
     driver_codes: dict[int, str | None]
     source_updated_at: datetime | None = None
+    observation_started_at: datetime | None = None
 
 
 class TelemetryProvider(Protocol):

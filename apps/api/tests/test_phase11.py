@@ -476,7 +476,7 @@ class Phase11Tests(unittest.TestCase):
                 opts={"as_sql": True, "output_buffer": output},
             )
             with Operations.context(context):
-                modules[-1].upgrade()
+                modules[3].upgrade()
             self.assertIn("TIMESTAMP WITH TIME ZONE", output.getvalue())
             self.assertIn("uq_session_update_session", output.getvalue())
         finally:

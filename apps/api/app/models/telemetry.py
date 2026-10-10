@@ -69,6 +69,8 @@ class SourceFields:
     source_record_id: Mapped[UUID] = mapped_column(
         ForeignKey("telemetry_source_records.id")
     )
+    # Import ordering metadata, not upstream telemetry or immutable revision time.
+    source_observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class DriverFields:

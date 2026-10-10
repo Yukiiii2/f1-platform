@@ -4,7 +4,7 @@ import type { Circuit, Driver, SearchPageProps, Team } from "./_lib/contracts";
 import {
   constructorStandings,
   driverStandings,
-  eventSessions,
+  homeCalendar,
   references,
   seasonContext,
   seasonEvents,
@@ -40,18 +40,13 @@ export default async function HomePage({ searchParams }: SearchPageProps) {
     driverStandings(season.year),
     constructorStandings(season.year),
   ]);
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  const scheduled = events.filter((event) =>
-    event.starts_at
-      ? Date.parse(event.starts_at) >= now.getTime()
-      : event.scheduled_date !== null && event.scheduled_date >= today,
+  const { featured, calendar, sessions } = await homeCalendar(
+    events,
+    new Date(),
   );
-  const featured = scheduled[0] ?? events.at(-1);
-  const calendar = scheduled.slice(0, 3);
   const topDrivers = driverRows.slice(0, 5);
   const topTeams = constructorRows.slice(0, 5);
-  const [circuits, drivers, teams, sessions] = await Promise.all([
+  const [circuits, drivers, teams] = await Promise.all([
     references<Circuit>(
       "circuits",
       [...calendar, ...(featured ? [featured] : [])].map(
@@ -66,7 +61,6 @@ export default async function HomePage({ searchParams }: SearchPageProps) {
       "teams",
       topTeams.map((row) => row.team_id),
     ),
-    featured ? eventSessions(featured.id) : Promise.resolve([]),
   ]);
   const circuit = featured ? circuits.get(featured.circuit_id) : null;
   const race = sessions.find((session) => session.type === "race");
@@ -87,9 +81,11 @@ export default async function HomePage({ searchParams }: SearchPageProps) {
           <div>
             <h1 id="featured-race">{featured.name}</h1>
             <p className="hero-context">
-              {scheduled.length
+              {calendar.length
                 ? "Next on the calendar"
-                : "Latest scheduled weekend"}
+                : race?.status === "completed"
+                  ? "Latest completed weekend"
+                  : "Latest scheduled weekend"}
             </p>
             <p className="intro">
               {circuit?.name}

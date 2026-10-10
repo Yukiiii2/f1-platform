@@ -6,12 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.ai.client import AIUnavailable, ModelClient
+from app.ai.protection import permit
 from app.ai.providers import configured_client
 from app.ai.service import AnswerError, ContextError, query
 from app.api.core import Database
 from app.core.config import get_settings
+from app.db.session import get_engine
 from app.schemas.ai import QueryRequest, QueryResponse
 
 
@@ -54,7 +57,18 @@ def ai_client():
 Client = Annotated[ModelClient, Depends(ai_client)]
 
 
-@router.post("/ai/query", response_model=QueryResponse)
+def pitwall_access():
+    try:
+        settings = get_settings()
+        with get_engine().connect() as connection, permit(connection, settings):
+            yield
+    except (RuntimeError, SQLAlchemyError, ValidationError):
+        raise HTTPException(503, "Pitwall is temporarily unavailable") from None
+
+
+@router.post(
+    "/ai/query", response_model=QueryResponse, dependencies=[Depends(pitwall_access)]
+)
 def ai_query(db: Database, request: QueryRequest, model: Client):
     try:
         return query(db, request, model)

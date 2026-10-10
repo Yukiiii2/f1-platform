@@ -526,7 +526,7 @@ class GeminiTests(unittest.TestCase):
                 self.fail("Missing key must not enable a provider")
 
     def test_endpoint_uses_gemini_without_changing_contract(self):
-        from app.api.ai import ai_client
+        from app.api.ai import ai_client, pitwall_access
         from app.api.core import database
         from app.main import app
 
@@ -551,6 +551,7 @@ class GeminiTests(unittest.TestCase):
         )
         app.dependency_overrides[database] = lambda: self.db
         app.dependency_overrides[ai_client] = lambda: client
+        app.dependency_overrides[pitwall_access] = lambda: None
         self.addCleanup(app.dependency_overrides.clear)
 
         async def check():

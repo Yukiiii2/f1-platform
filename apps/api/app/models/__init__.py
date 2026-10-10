@@ -11,6 +11,7 @@ from app.models.domain import (
     Team,
 )
 from app.models.imports import ImportRun, ProviderIdentity
+from app.models.pitwall import PitwallUsage
 from app.models.telemetry import (
     IntervalSample,
     Lap,
@@ -38,6 +39,7 @@ __all__ = [
     "Team",
     "ImportRun",
     "ProviderIdentity",
+    "PitwallUsage",
     "IntervalSample",
     "Lap",
     "PitStop",

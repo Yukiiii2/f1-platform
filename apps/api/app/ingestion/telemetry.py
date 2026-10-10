@@ -142,6 +142,10 @@ def persist_session_bundle(
     driver_ids: dict[int, UUID],
     bundle: TelemetryBundle,
 ) -> dict[str, int]:
+    observed_at = bundle.observation_started_at or bundle.fetched_at
+    if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+        raise ValueError("Telemetry observation time must be timezone-aware")
+    observed_at = observed_at.astimezone(timezone.utc)
     if db.get_bind().dialect.name == "postgresql":
         lock = int.from_bytes(
             hashlib.sha256(f"f1-import:{provider}".encode()).digest()[:8], signed=True
@@ -220,13 +224,29 @@ def persist_session_bundle(
             # Batch raw inserts before their normalized foreign-key references.
             db.flush()
             for key, revision, data in prepared:
-                data.update(source_record_id=revision, source_key=key)
+                data.update(
+                    source_record_id=revision,
+                    source_key=key,
+                    source_observed_at=observed_at,
+                )
                 row = existing.get(key)
                 if row is None:
                     row = model(**data)
                     db.add(row)
                     existing[key] = row
                 else:
+                    current = row.source_observed_at
+                    if current is not None:
+                        # SQLite fixture storage drops timezone offsets; PostgreSQL
+                        # keeps these timestamptz columns aware in production.
+                        current = (
+                            current.replace(tzinfo=timezone.utc)
+                            if current.tzinfo is None
+                            else current
+                        )
+                        if observed_at <= current:
+                            counts[kind] += 1
+                            continue
                     for field, value in data.items():
                         setattr(row, field, value)
                 counts[kind] += 1

@@ -13,10 +13,11 @@ from app.models import (
 )
 
 
-def list_entities(db: DbSession, model, limit: int, offset: int):
-    return list(
-        db.scalars(select(model).order_by(model.id).limit(limit).offset(offset))
-    )
+def list_entities(db: DbSession, model, limit: int, offset: int, ids=None):
+    query = select(model)
+    if ids is not None:
+        query = query.where(model.id.in_(ids))
+    return list(db.scalars(query.order_by(model.id).limit(limit).offset(offset)))
 
 
 def list_events(db: DbSession, year: int | None, limit: int, offset: int):

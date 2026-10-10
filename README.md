@@ -4,11 +4,12 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 ## Status
 
-Phase 8 — Pitwall AI backend, following Phase 08 in `CODEX_PROMPTS.md`.
+Phase 12 — production-readiness remediation of the implemented application.
 Web and API run independently.
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,
-the Telemetry Lab at `/telemetry`, and completed-race Strategy + Tyres at `/strategy`.
+the Telemetry Lab at `/telemetry`, completed-race Strategy + Tyres at `/strategy`,
+and grounded Pitwall analysis at `/pitwall` and within relevant data pages.
 All race data comes from the application's persisted domain APIs.
 Historical OpenF1 session data can be imported explicitly into normalized storage.
 Telemetry read APIs, deterministic tyre-age calculations, and backend lap
@@ -17,10 +18,12 @@ tyre context, and synchronized channels through the existing application APIs.
 Strategy compares source stints and pit stops, calculated tyre-age snapshots and
 observed non-pit pace, with recorded safety-car/VSC messages. Source boundary
 overlaps and missing records remain explicit; no strategy intent is inferred.
-The optional Pitwall backend provides `POST /v1/ai/query` with structured context,
+The optional Pitwall interface uses `POST /v1/ai/query` with structured page context,
 read-only application tools, and evidence-separated facts/calculations/estimates/
 interpretations. Configure it server-side as described in `apps/api/README.md`.
-There is no Pitwall frontend yet.
+Questions and retry controls remain available during temporary service failures.
+The Home page includes an optional, on-demand 3D car with a static fallback.
+Explicitly registered sessions can be finalized by the separate post-session worker.
 
 ## Planned V1
 
@@ -129,8 +132,9 @@ apps/api/.venv/Scripts/python.exe -m app.ingestion --season 2025
 
 This job calls Jolpica, validates and normalizes its core data, and commits it
 atomically. Repeated imports preserve domain IDs and update existing records.
-Import attempts and failures are recorded in `import_runs`. Imports are explicit;
-no scheduler or live timing is implemented. See [ingestion details](apps/api/README.md#core-data-imports)
+Import attempts and failures are recorded in `import_runs`. Manual imports remain
+available alongside automatic updates for explicitly registered sessions.
+See [ingestion details](apps/api/README.md#core-data-imports)
 for source fields, retries, limitations, and the read API routes.
 
 On macOS/Linux, replace `apps/api/.venv/Scripts/python.exe` with
@@ -153,6 +157,43 @@ for finding identifiers, read routes, source coverage, and lap-association limit
 See [lap comparison](apps/api/README.md#lap-comparison-phase-5) for
 `POST /v1/telemetry/compare`, alignment rules, and approximate-data opt-in.
 
+Telemetry import ordering is stored separately from immutable raw revisions.
+An older overlapping fetch cannot replace a newer normalized observation;
+repeated and corrected source payloads retain their raw revision history.
+
+### Automatic post-session updates
+
+Apply migrations and explicitly register each existing application session with
+its OpenF1 session key and driver UUID mappings before starting the worker. See
+[registration and scheduling](apps/api/README.md#automatic-post-session-updates-phase-11-prompt)
+for the supported `--register`, `--status`, `--once`, and `--retry` commands.
+
+```powershell
+$env:PYTHONPATH = "apps/api"
+apps/api/.venv/Scripts/python.exe -m app.workers --watch
+```
+
+The separate worker checks registered sessions every 30 minutes by default and
+requires historical settling and completion evidence before finalization. It
+refreshes available core data, imports telemetry, and records job status with
+bounded retries; PostgreSQL prevents overlapping workers. Stop with Ctrl+C.
+This is post-session scheduling, not live timing or automatic session discovery.
+
+### Pitwall admission protection
+
+Apply migrations through `0006_telemetry_observation_order` before running the
+updated API. Stop importers/workers during migration and fetch again afterward;
+existing telemetry receives a migration-time ordering watermark. Pitwall defaults
+to an aggregate 10 admitted queries/minute,
+100/day (UTC), and two concurrent queries, shared across API processes through
+PostgreSQL. Optional server-side `PITWALL_REQUESTS_PER_MINUTE`,
+`PITWALL_REQUESTS_PER_DAY`, and `PITWALL_MAX_CONCURRENT` override these limits;
+use identical values on all API replicas and direct PostgreSQL connections
+(session advisory locks require connection affinity, not transaction pooling).
+Rejected requests return a safe 429 with `Retry-After`; unavailable protection
+fails closed with 503. Admitted failures still consume the request budget.
+Existing provider retries and grounded-answer behavior remain unchanged.
+
 ### Formatting and lint baseline
 
 Run only the checks relevant to your changes:
@@ -174,8 +215,10 @@ The backend includes the nine core domain models, Pydantic schemas, Alembic,
 provider identity mappings, import metadata, core ingestion, and read APIs.
 The core frontend consumes the core read APIs. The backend also stores supported
 lap, telemetry, stint, pit, position, interval, race-control, and weather data.
-Backend lap comparison reads this persisted data. Telemetry UI, AI, authentication,
-live timing, and 3D remain planned.
+Backend lap comparison, Telemetry Lab, Strategy + Tyres, and grounded Pitwall all
+read this persisted data. Automatic updates require explicit registration; the
+optional 3D car is authored artwork, not a telemetry replay. Authentication and
+live timing remain outside the implemented scope.
 
 ## Disclaimer
 

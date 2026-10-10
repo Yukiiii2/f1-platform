@@ -565,6 +565,8 @@ class Phase4Tests(unittest.TestCase):
             "0002_core_ingestion.py",
             "0003_telemetry_pipeline.py",
             "0004_session_updates.py",
+            "0005_pitwall_protection.py",
+            "0006_telemetry_observation_order.py",
         ):
             path = Path(__file__).parents[1] / "migrations/versions" / filename
             spec = importlib.util.spec_from_file_location(filename, path)
@@ -581,15 +583,15 @@ class Phase4Tests(unittest.TestCase):
                     for module in modules:
                         module.upgrade()
                     self.assertEqual(compare_metadata(context, Base.metadata), [])
-                    modules[-1].downgrade()
-                    modules[-2].downgrade()
+                    for module in reversed(modules[2:]):
+                        module.downgrade()
             output = io.StringIO()
             context = MigrationContext.configure(
                 dialect_name="postgresql",
                 opts={"as_sql": True, "output_buffer": output},
             )
             with Operations.context(context):
-                modules[-2].upgrade()
+                modules[2].upgrade()
             self.assertIn("TIMESTAMP WITH TIME ZONE", output.getvalue())
             self.assertEqual(output.getvalue().count("CREATE TABLE "), 10)
         finally:

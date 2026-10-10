@@ -29,6 +29,22 @@ Offset = Annotated[int, Query(ge=0)]
 Year = Annotated[int, Query(ge=1950)]
 
 
+def identity_filter(ids: Annotated[str | None, Query(max_length=7399)] = None):
+    """Additive, bounded batch lookup for existing identity collections."""
+    if ids is None:
+        return None
+    try:
+        values = ids.split(",")
+        if not 1 <= len(values) <= 200:
+            raise ValueError()
+        return list(dict.fromkeys(UUID(value) for value in values))
+    except ValueError:
+        raise HTTPException(422, "Invalid identity filter") from None
+
+
+IdentityFilter = Annotated[list[UUID] | None, Depends(identity_filter)]
+
+
 def require(db, model, identifier):
     row = db.get(model, identifier)
     if row is None:
@@ -78,8 +94,10 @@ def results(db: Database, session_id: UUID, limit: Limit = 50, offset: Offset = 
 
 
 @router.get("/circuits", response_model=list[schemas.CircuitRead])
-def circuits(db: Database, limit: Limit = 50, offset: Offset = 0):
-    return core.list_entities(db, models.Circuit, limit, offset)
+def circuits(
+    db: Database, limit: Limit = 50, offset: Offset = 0, ids: IdentityFilter = None
+):
+    return core.list_entities(db, models.Circuit, limit, offset, ids)
 
 
 @router.get("/circuits/{circuit_id}", response_model=schemas.CircuitRead)
@@ -88,8 +106,10 @@ def circuit(db: Database, circuit_id: UUID):
 
 
 @router.get("/drivers", response_model=list[schemas.DriverRead])
-def drivers(db: Database, limit: Limit = 50, offset: Offset = 0):
-    return core.list_entities(db, models.Driver, limit, offset)
+def drivers(
+    db: Database, limit: Limit = 50, offset: Offset = 0, ids: IdentityFilter = None
+):
+    return core.list_entities(db, models.Driver, limit, offset, ids)
 
 
 @router.get("/drivers/{driver_id}", response_model=schemas.DriverRead)
@@ -98,8 +118,10 @@ def driver(db: Database, driver_id: UUID):
 
 
 @router.get("/teams", response_model=list[schemas.TeamRead])
-def teams(db: Database, limit: Limit = 50, offset: Offset = 0):
-    return core.list_entities(db, models.Team, limit, offset)
+def teams(
+    db: Database, limit: Limit = 50, offset: Offset = 0, ids: IdentityFilter = None
+):
+    return core.list_entities(db, models.Team, limit, offset, ids)
 
 
 @router.get("/teams/{team_id}", response_model=schemas.TeamRead)

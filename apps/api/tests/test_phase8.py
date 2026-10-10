@@ -496,12 +496,13 @@ class Phase8Tests(unittest.TestCase):
         self.assertNotIn("Bearer", " ".join(logs.output))
 
     def test_malformed_pitwall_request_does_not_echo_sensitive_input(self):
-        from app.api.ai import ai_client
+        from app.api.ai import ai_client, pitwall_access
         from app.api.core import database
         from app.main import app
 
         app.dependency_overrides[database] = lambda: self.db
         app.dependency_overrides[ai_client] = lambda: ScriptedModel()
+        app.dependency_overrides[pitwall_access] = lambda: None
         self.addCleanup(app.dependency_overrides.clear)
 
         async def check():
@@ -690,7 +691,7 @@ class Phase8Tests(unittest.TestCase):
     def test_endpoint_returns_structured_data_and_safe_configuration_failure(self):
         from unittest.mock import patch
 
-        from app.api.ai import ai_client
+        from app.api.ai import ai_client, pitwall_access
         from app.api.core import database
         from app.core.config import Settings
         from app.main import app
@@ -714,6 +715,7 @@ class Phase8Tests(unittest.TestCase):
         )
         app.dependency_overrides[database] = db_dependency
         app.dependency_overrides[ai_client] = lambda: model
+        app.dependency_overrides[pitwall_access] = lambda: None
         self.addCleanup(app.dependency_overrides.clear)
 
         async def check():

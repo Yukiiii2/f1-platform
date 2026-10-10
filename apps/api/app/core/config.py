@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     pitwall_model: str | None = Field(default=None, min_length=1, max_length=100)
     pitwall_fallback_models: str = Field(default="", max_length=305)
     pitwall_max_retries: int = Field(default=1, ge=0, le=2)
+    pitwall_requests_per_minute: int = Field(default=10, ge=1, le=100)
+    pitwall_requests_per_day: int = Field(default=100, ge=1, le=10000)
+    pitwall_max_concurrent: int = Field(default=2, ge=1, le=8)
 
     @field_validator("pitwall_max_retries", mode="before")
     @classmethod

@@ -1,6 +1,7 @@
 import logging
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
@@ -120,6 +121,7 @@ class OpenF1Provider:
             raise ValueError(
                 "Explicit source session and positive driver numbers are required"
             )
+        observation_started_at = datetime.now(timezone.utc)
         params = {"session_key": source_session}
         data = {"sessions": self._request("sessions", params)}
         try:
@@ -145,7 +147,10 @@ class OpenF1Provider:
                                 allow_empty=True,
                             )
                         )
-            return normalize(data, source_session, drivers, datetime.now(timezone.utc))
+            return replace(
+                normalize(data, source_session, drivers, datetime.now(timezone.utc)),
+                observation_started_at=observation_started_at,
+            )
         except (ValueError, TypeError, KeyError) as error:
             raise ProviderError("OpenF1 data is incomplete or inconsistent") from error
 
