@@ -88,6 +88,23 @@ export function postEntity<T>(
 ): Promise<T> {
   return request<T>(path, {}, body, timeout, "POST", headers);
 }
+export function workspaceRequest<T>(
+  path: string,
+  method: "GET" | "POST" | "PATCH" | "DELETE" = "GET",
+  body?: unknown,
+  query: Record<string, string | number> = {},
+  headers: Record<string, string> = {},
+): Promise<T> {
+  const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+  if (
+    !new RegExp(
+      `^(?:collections(?:/${uuid}(?:/items(?:/${uuid})?)?)?|favorites(?:/${uuid})?)$`,
+      "i",
+    ).test(path)
+  )
+    throw new ApiError(404);
+  return request<T>(path, query, body, 8000, method, headers);
+}
 export function getSessionStrategy<T>(sessionId: string): Promise<T> {
   return request<T>(`sessions/${sessionId}/strategy`);
 }

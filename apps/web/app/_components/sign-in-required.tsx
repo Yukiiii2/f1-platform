@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { authHref } from "../_lib/auth";
 import { EmptyState } from "./ui";
-export function SignInRequired({ next }: { next: string }) {
+export function SignInRequired({
+  next,
+  title = "Sign in to use Saved Comparisons",
+}: {
+  next: string;
+  title?: string;
+}) {
   return (
-    <EmptyState title="Sign in to use Saved Comparisons">
+    <EmptyState title={title}>
       <p>
         Race data and analysis remain public. Your selections will be restored
         after sign-in.

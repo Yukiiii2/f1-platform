@@ -15,6 +15,12 @@ export function AccountControls({ user, error }: AccountState) {
       {user ? (
         <>
           <Link
+            href={`/workspace${/^\d{4}$/.test(query.get("season") ?? "") ? `?season=${query.get("season")}` : ""}`}
+            prefetch={false}
+          >
+            Workspace
+          </Link>
+          <Link
             href={`/account${/^\d{4}$/.test(query.get("season") ?? "") ? `?season=${query.get("season")}` : ""}`}
             prefetch={false}
           >

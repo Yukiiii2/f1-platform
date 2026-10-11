@@ -85,6 +85,48 @@ tokens, password hashes and credentials never appear in rendered metadata or
 browser storage. Manual review should include mobile layout, keyboard/focus
 behavior and password-change cookie refresh across two browser sessions.
 
+## Analysis workspace (V2 Phase 7)
+
+Apply backend migration `0011_analysis_workspace` before using `/workspace`.
+Signed-in navigation adds Workspace alongside Account/Sign out, without adding
+collection/favorite links to the main race-data navigation. No new web environment
+variables are required.
+
+The private workspace lists recent saved-comparison presets, collections, favorite
+drivers and favorite race weekends. It shows existing creation/update timestamps,
+not a social feed or complete activity log. Collections have a title and optional
+description, owner-only editing and confirmed deletion. `/collections/<UUID>`
+lists reference types, recorded labels, season context and Open/Remove actions.
+Collection, item and favorite lists paginate in groups of 50; recent comparisons
+shows the five most recently updated presets. Adding to a collection lazily loads only the
+signed-in user's collection choices, with Load more when needed.
+
+Saved Comparisons offers Add to collection. Race weekends offer Favorite weekend
+and Add to collection; selected sessions offer Add to collection. Driver profiles
+offer Favorite driver and Add to collection. Signed-out viewers see a sign-in
+link with the original public page context retained; viewing public data stays
+available. Inline pending/error/success states preserve failed selections. An
+expired session offers sign-in again; temporary failures offer retry/reload.
+
+Items hold IDs and saved season context only. Open returns to the existing race,
+driver or selected-session view, or revalidates/reopens an existing saved comparison.
+Partial/missing analysis is never fabricated. Deleted comparisons remain visible as
+unavailable references, without an Open link. Deleting a collection removes only
+its items; it preserves saved comparisons and public data. Account deletion removes
+all owned workspace material. Favorites are unique per driver/weekend identity;
+their original bookmarked season is retained when favoriting again in another year.
+
+Focused checks from repository root:
+
+```powershell
+node --experimental-strip-types --test apps/web/tests/workspace.test.mjs apps/web/tests/auth.test.mjs apps/web/tests/account.test.mjs apps/web/tests/comparisons.test.mjs apps/web/tests/replay-routing.test.mjs
+```
+
+Manual review: `/workspace`, `/collections/<created UUID>`, `/comparisons`,
+`/races/<event UUID>?season=2025` and `/drivers/<driver UUID>?season=2025`.
+Check keyboard/mobile controls, sign-in return context, two-user isolation,
+missing-reference messages and confirmed deletion.
+
 ## First 3D feature (Phase 10 prompt)
 
 The existing homepage race hero includes an authored open-wheel illustration.

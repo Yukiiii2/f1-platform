@@ -965,7 +965,7 @@ The frontend exposes these at `/account` after sign-in.
   current user's other sessions.
 - `DELETE /v1/auth/account`: `{current_password,confirmation:"DELETE"}`; 204.
   Permanently removes only the signed-in user's saved comparisons, sessions and
-  account, then clears the cookie. Shared F1 records and unassigned legacy presets
+  account, including its collections/favorites, then clears the cookie. Shared F1 records and unassigned legacy presets
   remain untouched. This action cannot be undone.
 
 These routes accept no target user ID. Missing/expired authentication returns 401;
@@ -982,6 +982,68 @@ Focused checks from repository root (PostgreSQL checks use disposable schemas):
 $env:PYTHONPATH = "apps/api;apps/api/tests"
 $env:F1_TEST_POSTGRES = "1"
 apps/api/.venv/Scripts/python.exe -m unittest test_v2_account test_v2_auth test_v2_comparisons
+```
+
+## Analysis workspace (V2 Phase 7)
+
+Apply additive migration `0011_analysis_workspace` after `0010_user_accounts`:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini check
+```
+
+It creates `collections`, `collection_items` and `favorites`, using application
+UUIDs and timezone-aware timestamps. No new environment values or dependencies
+are needed. Every collection/favorite has an authenticated user FK; collection
+items inherit ownership through their collection. Lists are bounded and paginated
+(default 50, maximum 200); identity labels are resolved in batches.
+
+Authenticated REST routes (writes also require the existing CSRF header/origin):
+
+- `GET /v1/collections?limit=50&offset=0`: own collections with item counts.
+- `POST /v1/collections`: `{title,description?}`; 201. Title: 1–120 trimmed
+  characters; optional description: up to 1000. Duplicate titles are allowed.
+- `GET /v1/collections/{id}?limit=50&offset=0`: metadata and one item page.
+- `PATCH /v1/collections/{id}`: title and/or description; `description:null`
+  clears it, but a title cannot be null or empty.
+- `DELETE /v1/collections/{id}`: 204; removes its references, preserving saved
+  comparisons and all public data.
+- `POST /v1/collections/{id}/items`: `{reference_type,reference_id,season}`;
+  types: `comparison`, `event`, `driver`, `session`. Returns 201; repeating the
+  same reference and season returns the existing item.
+- `DELETE /v1/collections/{id}/items/{item_id}`: 204; removes only that reference.
+- `GET /v1/favorites`: own paginated bookmarks; optional `reference_type`
+  (`driver`/`event`) and `reference_id` filters.
+- `POST /v1/favorites`: same reference shape, only `driver`/`event`; 201.
+  One favorite per user/type/identity; repeating it retains the original season
+  context rather than silently changing the bookmarked year.
+- `DELETE /v1/favorites/{id}`: 204.
+
+Season must be imported (1950–9999). Events/sessions must belong to that season;
+comparisons must also belong to the signed-in user. Driver references reopen the
+identity page in the saved season without claiming that season's statistics exist.
+New malformed/missing/mismatched references return 422. Reads preserve original
+IDs after referenced records disappear (`SET NULL` FKs), return explicit
+`unavailable` notices and omit the opening URL. Comparison references reuse the
+existing revalidation service; reopening recalculates through the existing analysis
+pages. No AI answers, telemetry copies or guessed replacements are stored.
+
+Private responses use `no-store`. Another user's private IDs return the same 404
+as nonexistent IDs. Mutations reuse aggregate auth minute/concurrency admission
+and lock/revalidate the current user's session before writing. User locks plus
+unique constraints protect overlapping duplicate adds. Account deletion cascades
+to collections/items/favorites; public race ownership is unchanged. Migration
+rollback refuses while workspace rows exist and requires an explicit preservation
+plan. There is no sharing, social feed, tagging or analytics snapshot in this phase.
+
+Local focused checks (PostgreSQL uses disposable schemas):
+
+```powershell
+$env:PYTHONPATH = "apps/api;apps/api/tests"
+$env:F1_TEST_POSTGRES = "1"
+apps/api/.venv/Scripts/python.exe -m unittest test_v2_workspace test_v2_auth test_v2_account test_v2_comparisons
+node --experimental-strip-types --test apps/web/tests/workspace.test.mjs apps/web/tests/auth.test.mjs apps/web/tests/account.test.mjs apps/web/tests/comparisons.test.mjs apps/web/tests/replay-routing.test.mjs
 ```
 
 Focused checks:

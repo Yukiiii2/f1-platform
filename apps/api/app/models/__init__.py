@@ -28,8 +28,12 @@ from app.models.telemetry import (
     WeatherSample,
 )
 from app.models.updates import SessionUpdateJob
+from app.models.workspace import Collection, CollectionItem, Favorite
 
 __all__ = [
+    "Collection",
+    "CollectionItem",
+    "Favorite",
     "AuthSession",
     "AuthUsage",
     "User",

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Pitwall } from "../../_components/pitwall";
+import { ReferenceActions } from "../../_components/reference-actions";
 import { suggestedQuestions } from "../../_lib/pitwall";
 import type { Driver, SearchParams, Team } from "../../_lib/contracts";
 import { sessionNames } from "../../_lib/contracts";
@@ -87,6 +88,16 @@ export default async function DriverPage({
       <a className="back-link" href="#pitwall">
         Ask Pitwall about this driver
       </a>
+      {season && (
+        <ReferenceActions
+          reference={{
+            reference_type: "driver",
+            reference_id: driver.id,
+            season: season.year,
+          }}
+          returnTo={`/drivers/${driver.id}?season=${season.year}${selected ? `&event=${selected.id}` : ""}`}
+        />
+      )}
       <dl className="facts">
         <div>
           <dt>Permanent number</dt>

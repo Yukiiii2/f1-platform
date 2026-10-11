@@ -24,6 +24,10 @@ V2 Phase 6 adds `/account`: change your sign-in name/password, inspect active
 sessions, sign out other sessions, or explicitly delete your account and private
 presets. Public F1 data is preserved. No additional migration or configuration is
 required; see [account settings](apps/api/README.md#account-settings-v2-phase-6).
+V2 Phase 7 adds a private `/workspace`, collections at `/collections/<UUID>` and
+driver/weekend favorites. Apply migration `0011_analysis_workspace` with the
+existing Alembic upgrade command. Collections hold references, never copied F1
+datasets; missing references remain explicit. See the [workspace guide](apps/api/README.md#analysis-workspace-v2-phase-7).
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,
 the Telemetry Lab at `/telemetry`, completed-race Strategy + Tyres at `/strategy`,

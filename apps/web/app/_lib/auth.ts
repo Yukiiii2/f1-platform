@@ -16,7 +16,7 @@ export function safeReturnTo(value?: string): string {
   if (!value || value.length > 4096 || /[\\\u0000-\u001f\u007f]/.test(value))
     return "/comparisons";
   if (
-    !/^\/(?:[?#]|$|(?:account|telemetry|strategy|pitwall|comparisons|races|drivers|standings)(?:\/[a-zA-Z0-9-]+)*(?:[?#]|$))/.test(
+    !/^\/(?:[?#]|$|(?:workspace|collections|account|telemetry|strategy|pitwall|comparisons|races|drivers|standings)(?:\/[a-zA-Z0-9-]+)*(?:[?#]|$))/.test(
       value,
     )
   )

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { SavedComparison } from "../_lib/saved-comparison-contracts";
 import { renameComparison, deleteComparison } from "./actions";
 import { comparisonError } from "../_lib/saved-comparisons";
+import { AddToCollection } from "../_components/reference-controls";
 
 const labels = {
   telemetry_laps: "Telemetry lap comparison",
@@ -181,6 +182,14 @@ function SavedRow({ row }: { row: SavedComparison }) {
         <div role="status" aria-live="polite">
           {error && <p>{error}</p>}
         </div>
+        <AddToCollection
+          reference={{
+            reference_type: "comparison",
+            reference_id: row.id,
+            season: row.configuration.season,
+          }}
+          returnTo={`/comparisons?season=${row.configuration.season}`}
+        />
       </article>
     </li>
   );

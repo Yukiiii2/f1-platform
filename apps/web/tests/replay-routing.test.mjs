@@ -98,6 +98,7 @@ const { default: ReplayPage } = component("races/[eventId]/replay/page.tsx", {
   "./replay.css": {},
 });
 const { default: RacePage } = component("races/[eventId]/page.tsx", {
+  "../../_components/reference-actions": { ReferenceActions: () => null },
   ...shared,
   "../../_lib/data": data,
   "../../_lib/api": api,

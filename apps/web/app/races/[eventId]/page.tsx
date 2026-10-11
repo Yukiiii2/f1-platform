@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SessionUpdates } from "../../_components/session-updates";
+import { ReferenceActions } from "../../_components/reference-actions";
 import { Pitwall } from "../../_components/pitwall";
 import { suggestedQuestions } from "../../_lib/pitwall";
 import { redirect } from "next/navigation";
@@ -95,6 +96,16 @@ export default async function RacePage({
           </Link>
         )}
       </nav>
+      {season && (
+        <ReferenceActions
+          reference={{
+            reference_type: "event",
+            reference_id: event.id,
+            season: season.year,
+          }}
+          returnTo={`/races/${event.id}?season=${season.year}${selected ? `&session=${selected.id}` : ""}`}
+        />
+      )}
       <dl className="facts">
         <div>
           <dt>Season</dt>
@@ -169,6 +180,16 @@ export default async function RacePage({
           </div>
         )}
         {selected && <SessionUpdates session={selected} />}
+        {selected && season && (
+          <ReferenceActions
+            reference={{
+              reference_type: "session",
+              reference_id: selected.id,
+              season: season.year,
+            }}
+            returnTo={`/races/${event.id}?season=${season.year}&session=${selected.id}#results`}
+          />
+        )}
         {results.length > 0 && selected ? (
           <>
             <ResultsTable

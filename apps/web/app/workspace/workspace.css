@@ -1,0 +1,69 @@
+.workspace-section {
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+  padding-block: 1.5rem;
+}
+.workspace-section h2 {
+  margin-top: 0;
+}
+.workspace-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.workspace-list li {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-block: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.workspace-list li > div:first-child {
+  flex: 1 1 22rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workspace-list p {
+  max-width: 70ch;
+}
+.workspace-actions,
+.private-reference-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  margin-block: 1rem;
+}
+.private-reference-actions > [role="status"] {
+  flex-basis: 100%;
+}
+.workspace-editor {
+  max-width: 40rem;
+  margin-block: 1rem 2rem;
+}
+.workspace-editor form {
+  margin-block: 1rem;
+}
+.workspace-editor textarea {
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--control-border);
+  padding: 0.75rem;
+  font: inherit;
+  resize: vertical;
+}
+.collection-picker {
+  margin-block: 0.75rem;
+}
+.collection-picker form {
+  margin-top: 1rem;
+}
+.collection-picker summary,
+.workspace-editor summary {
+  cursor: pointer;
+  padding-block: 0.5rem;
+}
+.collection-picker .field {
+  min-width: 0;
+}

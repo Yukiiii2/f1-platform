@@ -386,6 +386,7 @@ class PostgresAccountTests(unittest.TestCase):
         from alembic.operations import Operations
 
         self.legacy_id, self.workspace = uuid4(), uuid4()
+        self.following_migrations = []
         with self.engine.begin() as conn:
             conn.execute(text(f'SET LOCAL search_path TO "{self.schema}"'))
             context = MigrationContext.configure(
@@ -415,6 +416,8 @@ class PostgresAccountTests(unittest.TestCase):
                         )
                         self.migration = migration
                     migration.upgrade()
+                    if path.stem > "0010_user_accounts":
+                        self.following_migrations.append(migration)
 
     def test_schema_legacy_preservation_constraints_and_safe_rollback(self):
         from alembic.autogenerate import compare_metadata
@@ -479,8 +482,12 @@ class PostgresAccountTests(unittest.TestCase):
                 conn, opts={"target_metadata": models.Base.metadata}
             )
             with Operations.context(context):
+                for migration in reversed(self.following_migrations):
+                    migration.downgrade()
                 self.migration.downgrade()
                 self.migration.upgrade()
+                for migration in self.following_migrations:
+                    migration.upgrade()
             self.assertEqual(compare_metadata(context, models.Base.metadata), [])
 
     def test_database_shared_admission_bounds_and_failure_recovery(self):

@@ -120,6 +120,9 @@ test("strategy preset preserves explicit provider-scoped pair, never single driv
 
 test("Saved Comparisons shows context, metadata, open, rename, delete and unavailable records", async () => {
   const Manage = load("comparisons/manage-comparisons.tsx", {
+    "../_components/reference-controls": {
+      AddToCollection: () => createElement("button", {}, "Add to collection"),
+    },
     "next/link": link,
     "next/navigation": { useRouter: () => ({ refresh() {} }) },
     "./actions": {},
@@ -345,6 +348,7 @@ test("save/rename/delete controls invoke their actions and refresh only after su
   assert.equal(calls[0][1].title, "Lap pair");
   assert.equal(calls[0][1].configuration.lap_b_id, "lap-b");
   const Manage = load("comparisons/manage-comparisons.tsx", {
+    "../_components/reference-controls": { AddToCollection: () => null },
     react: hooks,
     "next/link": link,
     "next/navigation": { useRouter: () => ({ refresh: () => refreshed++ }) },

@@ -281,8 +281,9 @@ export function AccountSettings({
         <h2 id={`${id}-delete-heading`}>Delete account</h2>
         <p>
           This permanently removes your account, its sessions and{" "}
-          {profile.saved_comparison_count} saved comparisons. Public race and
-          telemetry data is preserved.
+          {profile.saved_comparison_count} saved comparisons, plus your
+          collections and favorites. Public race and telemetry data is
+          preserved.
         </p>
         <details>
           <summary>Review permanent account deletion</summary>
