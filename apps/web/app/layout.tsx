@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import localFont from "next/font/local";
 import { Navigation, SeasonHomeLink } from "./_components/navigation";
+import { AccountNavigation } from "./_components/account-navigation";
+import "./auth/auth.css";
 import "./globals.css";
 
 const displayFont = localFont({
@@ -59,6 +61,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               }
             >
               <Navigation />
+            </Suspense>
+            <Suspense
+              fallback={<span className="section-note">Loading account…</span>}
+            >
+              <AccountNavigation />
             </Suspense>
           </div>
         </header>

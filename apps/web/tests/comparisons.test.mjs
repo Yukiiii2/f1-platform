@@ -10,6 +10,7 @@ import * as format from "../app/_lib/format.ts";
 import * as contracts from "../app/_lib/contracts.ts";
 import * as telemetry from "../app/_lib/telemetry.ts";
 import * as strategy from "../app/_lib/strategy.ts";
+import { authHref } from "../app/_lib/auth.ts";
 import {
   telemetryPreset,
   strategyPreset,
@@ -18,6 +19,16 @@ import {
 
 const id = "11111111-1111-4111-8111-111111111111";
 const context = { season: 2025, event_id: id, session_id: id };
+const authAPI = {
+  sessionHeaders: async () => ({
+    "X-F1-Auth": "1",
+    Cookie: "f1_session=test-session",
+  }),
+  accountState: async () => ({ user: { id: "account", username: "driver-a" } }),
+};
+const signIn = {
+  SignInRequired: () => createElement("p", {}, "Sign in required"),
+};
 const laps = [
   { id: "lap-a", driver_id: "norris" },
   { id: "lap-b", driver_id: "max" },
@@ -115,6 +126,8 @@ test("Saved Comparisons shows context, metadata, open, rename, delete and unavai
     "../_lib/saved-comparisons": { comparisonError },
   }).ManageComparisons;
   const Page = load("comparisons/page.tsx", {
+    "../_lib/auth-api": authAPI,
+    "../_components/sign-in-required": signIn,
     "next/link": link,
     "../_lib/api": {
       getComparisonPage: async () => [
@@ -157,6 +170,8 @@ test("Saved Comparisons shows context, metadata, open, rename, delete and unavai
 test("open revalidates on server and restores URL; missing references never redirect", async () => {
   let row = saved;
   const Page = load("comparisons/[comparisonId]/open/page.tsx", {
+    "../../../_lib/auth-api": authAPI,
+    "../../../_components/sign-in-required": signIn,
     "next/link": link,
     "next/navigation": {
       redirect: (url) => {
@@ -187,6 +202,7 @@ test("open revalidates on server and restores URL; missing references never redi
 
 test("save, rename and delete server actions use only application API with safe failures", async () => {
   const actions = load("comparisons/actions.ts", {
+    "../_lib/auth-api": authAPI,
     "../_lib/api": api,
     "../_lib/saved-comparisons": { comparisonError },
   });
@@ -218,6 +234,9 @@ test("save, rename and delete server actions use only application API with safe 
       ["POST", "PATCH", "DELETE"],
     );
     assert.equal(JSON.parse(calls[1].body).title, "Renamed");
+    assert.ok(
+      calls.every((call) => call.headers.Cookie === "f1_session=test-session"),
+    );
     globalThis.fetch = async () =>
       new Response("internal secret/provider detail", { status: 503 });
     const failure = await actions.saveComparison({
@@ -233,6 +252,7 @@ test("save, rename and delete server actions use only application API with safe 
 
 test("save form is labelled and navigation preserves selected season", () => {
   const Save = load("_components/save-comparison.tsx", {
+    "../_lib/auth": { authHref },
     "next/link": link,
     "../comparisons/actions": {},
     "../_lib/saved-comparisons": { comparisonError },
@@ -241,6 +261,8 @@ test("save form is labelled and navigation preserves selected season", () => {
     createElement(Save, {
       preset: telemetryPreset(context, laps, pair),
       suggestedTitle: "Norris vs Verstappen",
+      signedIn: true,
+      returnTo: "/telemetry?season=2025",
     }),
   );
   assert.ok(html.includes("Save comparison"));
@@ -304,6 +326,7 @@ test("save/rename/delete controls invoke their actions and refresh only after su
     },
   };
   const Save = load("_components/save-comparison.tsx", {
+    "../_lib/auth": { authHref },
     react: hooks,
     "next/link": link,
     "../comparisons/actions": actionMocks,
@@ -312,6 +335,8 @@ test("save/rename/delete controls invoke their actions and refresh only after su
   const tree = Save({
     preset: telemetryPreset(context, laps, pair),
     suggestedTitle: "Lap pair",
+    signedIn: true,
+    returnTo: "/telemetry?season=2025",
   });
   find(tree, (node) => node.type === "form").props.onSubmit({
     preventDefault() {},
@@ -375,6 +400,7 @@ test("existing telemetry and strategy pages save actual selected state, not a ne
   };
   const presets = [];
   const common = {
+    "../_lib/auth-api": authAPI,
     "next/link": link,
     "next/navigation": {
       notFound: () => {

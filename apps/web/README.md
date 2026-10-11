@@ -39,7 +39,34 @@ scrollable table regions, and responsive layouts. Route loading uses static
 skeletons; failed reads use a retry boundary; missing UUIDs use a not-found page.
 The Telemetry Lab adds stored historical lap comparison. Strategy adds completed-race
 stint comparison. Pitwall adds contextual analysis. The homepage adds one optional
-illustrative 3D car. No authentication or live updates are included.
+illustrative 3D car. Near-live updates retain explicit provisional labels;
+accounts protect saved presets while race data remains public.
+
+## Accounts and private Saved Comparisons (V2 Phase 5)
+
+Run the existing web dev command with `NEXT_PUBLIC_API_URL` pointing to the local
+API. Apply backend migration `0010_user_accounts` first; see the
+[API account setup](../api/README.md#accounts-and-ownership-v2-phase-5).
+No frontend credential/secret variable is needed. Never use `NEXT_PUBLIC_*` for
+passwords, API keys or session tokens.
+
+Visit `/create-account` to register or `/sign-in` to log in. The header shows the
+sign-in name and Sign out. Authentication uses server actions and HttpOnly cookies;
+no password/token is stored in browser local storage. `/comparisons` lists only the
+signed-in user's presets; existing Open, Rename and confirmed Delete remain.
+Logged-out save actions link to sign-in with the exact season/event/session,
+drivers, laps and settings retained in a validated local return URL. No alternate
+records are chosen. Public telemetry, strategy, replay and Pitwall remain usable.
+Expired sessions ask for sign-in again; temporary account failures leave analysis
+selections intact. Deployment requires HTTPS/Secure cookies and exact trusted web
+origins configured server-side. Legacy workspace presets require explicit operator
+assignment and are never automatically given to a new registrant.
+
+Focused checks from repository root:
+
+```powershell
+node --experimental-strip-types --test apps/web/tests/auth.test.mjs apps/web/tests/comparisons.test.mjs
+```
 
 ## First 3D feature (Phase 10 prompt)
 

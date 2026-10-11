@@ -2,6 +2,7 @@
 
 import { useId, useState, useTransition } from "react";
 import Link from "next/link";
+import { authHref } from "../_lib/auth";
 import { saveComparison } from "../comparisons/actions";
 import { comparisonError } from "../_lib/saved-comparisons";
 import type { Preset, SaveResult } from "../_lib/saved-comparison-contracts";
@@ -9,14 +10,35 @@ import type { Preset, SaveResult } from "../_lib/saved-comparison-contracts";
 export function SaveComparison({
   preset,
   suggestedTitle,
+  signedIn,
+  returnTo,
+  authUnavailable = false,
 }: {
   preset: Preset;
   suggestedTitle: string;
+  signedIn: boolean;
+  returnTo: string;
+  authUnavailable?: boolean;
 }) {
   const id = useId();
   const [title, setTitle] = useState(suggestedTitle.slice(0, 120));
   const [result, setResult] = useState<SaveResult | null>(null);
   const [pending, startTransition] = useTransition();
+  if (authUnavailable)
+    return (
+      <p className="section-note" role="status">
+        Account access is temporarily unavailable. Your analysis selections are
+        unchanged.
+      </p>
+    );
+  if (!signedIn)
+    return (
+      <p className="section-note">
+        <Link href={authHref("sign-in", returnTo)} prefetch={false}>
+          Sign in to save this comparison
+        </Link>
+      </p>
+    );
   return (
     <details className="save-comparison">
       <summary>Save comparison</summary>
@@ -56,11 +78,16 @@ export function SaveComparison({
         </button>
       </form>
       <p className="section-note">
-        Saves these selections locally. Analysis is recalculated from recorded
-        data when reopened.
+        Saves these selections to your account. Analysis is recalculated from
+        recorded data when reopened.
       </p>
       <div role="status" aria-live="polite">
         {result?.error && <p>{result.error}</p>}
+        {result?.signInRequired && (
+          <Link href={authHref("sign-in", returnTo)} prefetch={false}>
+            Sign in to save this comparison
+          </Link>
+        )}
         {result?.response && (
           <p>
             Comparison saved.{" "}

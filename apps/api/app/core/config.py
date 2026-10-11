@@ -20,6 +20,36 @@ class Settings(BaseSettings):
     openf1_password: SecretStr | None = Field(default=None, repr=False)
     session_live_poll_seconds: int = Field(default=60, ge=60, le=300)
     saved_comparisons_owner_id: UUID = UUID("00000000-0000-0000-0000-000000000001")
+    auth_cookie_secure: bool = False
+    auth_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    auth_session_hours: int = Field(default=12, ge=1, le=168)
+    auth_requests_per_minute: int = Field(default=20, ge=1, le=100)
+    auth_max_concurrent: int = Field(default=2, ge=1, le=4)
+
+    @field_validator("auth_allowed_origins")
+    @classmethod
+    def browser_origins(cls, value):
+        from urllib.parse import urlsplit
+
+        values = [item.strip() for item in value.split(",") if item.strip()]
+        for origin in values:
+            parts = urlsplit(origin)
+            if (
+                parts.scheme not in {"http", "https"}
+                or not parts.hostname
+                or parts.username
+                or parts.password
+                or parts.path
+                or parts.query
+                or parts.fragment
+            ):
+                raise ValueError(
+                    "Use comma-separated HTTP(S) browser origins without paths"
+                )
+        if not values:
+            raise ValueError("At least one browser origin is required")
+        return ",".join(dict.fromkeys(values))
+
     openai_api_key: SecretStr | None = Field(default=None, repr=False)
     gemini_api_key: SecretStr | None = Field(default=None, repr=False)
     pitwall_provider: Literal["openai", "gemini"] = "openai"

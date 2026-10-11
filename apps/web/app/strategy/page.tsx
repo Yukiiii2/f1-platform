@@ -24,6 +24,7 @@ import {
 } from "../_components/ui";
 import { StrategyView } from "./strategy-view";
 import { SaveComparison } from "../_components/save-comparison";
+import { accountState } from "../_lib/auth-api";
 import { strategyPreset } from "../_lib/saved-comparisons";
 import "./strategy.css";
 
@@ -31,6 +32,13 @@ export const metadata: Metadata = { title: "Strategy + Tyres" };
 
 export default async function StrategyPage({ searchParams }: SearchPageProps) {
   const query = await searchParams;
+  const account = await accountState();
+  const returnTo = `/strategy?${new URLSearchParams(
+    Object.entries(query).flatMap(([key, value]) => {
+      const item = single(value);
+      return item === undefined ? [] : [[key, item]];
+    }),
+  )}`;
   const { seasons, season } = await seasonContext(query);
   const events = season ? await seasonEvents(season.year) : [];
   const event = events.find((row) => row.id === single(query.event));
@@ -240,6 +248,9 @@ export default async function StrategyPage({ searchParams }: SearchPageProps) {
                     <SaveComparison
                       key={JSON.stringify(preset)}
                       preset={preset}
+                      signedIn={!!account.user}
+                      authUnavailable={!!account.error}
+                      returnTo={returnTo}
                       suggestedTitle={`${season.year} ${event.name} · ${selected.map((row) => driverName(drivers.get(row.driver_id)!)).join(" / ")}`}
                     />
                   )}

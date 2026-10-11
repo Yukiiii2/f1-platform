@@ -1,4 +1,5 @@
 from app.db.base import Base
+from app.models.auth import AuthSession, AuthUsage, User
 from app.models.comparisons import SavedComparison
 from app.models.core_sources import CoreSourceRevision, CoreSourceState
 from app.models.domain import (
@@ -29,6 +30,9 @@ from app.models.telemetry import (
 from app.models.updates import SessionUpdateJob
 
 __all__ = [
+    "AuthSession",
+    "AuthUsage",
+    "User",
     "SavedComparison",
     "CoreSourceRevision",
     "CoreSourceState",

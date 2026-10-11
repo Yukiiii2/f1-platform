@@ -13,11 +13,13 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 V1 Phase 0-12 foundation with V2 near-live session updates and historical seasons.
 Web and API run independently.
-V2 Phase 4 adds local Saved Comparisons at `/comparisons`. Save an existing
+V2 Phase 5 adds accounts at `/create-account` and `/sign-in`, and private Saved
+Comparisons at `/comparisons`. Save an existing
 Telemetry Lab lap pair or Strategy driver pair and reopen the same selections;
 analysis is recalculated from current recorded data. Apply migration
-`0009_saved_comparisons` before using it. See
-[saved-comparison storage, ownership and API notes](apps/api/README.md#saved-comparisons-v2-phase-4).
+`0010_user_accounts` before using it (`apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head`). Public race data needs no account.
+Existing workspace presets are preserved for explicit operator assignment. See
+[account setup and ownership notes](apps/api/README.md#accounts-and-ownership-v2-phase-5).
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,
 the Telemetry Lab at `/telemetry`, completed-race Strategy + Tyres at `/strategy`,
@@ -253,8 +255,9 @@ The core frontend consumes the core read APIs. The backend also stores supported
 lap, telemetry, stint, pit, position, interval, race-control, and weather data.
 Backend lap comparison, Telemetry Lab, Strategy + Tyres, and grounded Pitwall all
 read this persisted data. Automatic updates require explicit registration; the
-optional 3D car is authored artwork, not a telemetry replay. Authentication and
-live timing remain outside the implemented scope.
+optional 3D car is authored artwork, separate from recorded multi-car replay.
+First-party authentication protects saved presets; public data and bounded
+near-live updates retain their existing behavior.
 
 ## Disclaimer
 

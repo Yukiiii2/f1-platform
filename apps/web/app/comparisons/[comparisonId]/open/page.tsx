@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { ApiError, getSavedComparison } from "../../../_lib/api";
 import type { SavedComparison } from "../../../_lib/saved-comparison-contracts";
 import { EmptyState } from "../../../_components/ui";
+import { sessionHeaders } from "../../../_lib/auth-api";
+import { SignInRequired } from "../../../_components/sign-in-required";
 
 export default async function OpenComparison({
   params,
@@ -12,9 +14,14 @@ export default async function OpenComparison({
   const { comparisonId } = await params;
   let row: SavedComparison;
   try {
-    row = await getSavedComparison<SavedComparison>(comparisonId);
+    row = await getSavedComparison<SavedComparison>(
+      comparisonId,
+      await sessionHeaders(),
+    );
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
+    if (error.status === 401)
+      return <SignInRequired next={`/comparisons/${comparisonId}/open`} />;
     return (
       <EmptyState
         title={

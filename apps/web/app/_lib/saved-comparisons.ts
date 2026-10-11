@@ -56,6 +56,8 @@ export function strategyPreset(
   };
 }
 export function comparisonError(status: number) {
+  if (status === 401)
+    return "Sign in again to manage your saved comparisons. Your selections are unchanged.";
   return status === 404
     ? "This saved comparison is no longer available. Return to Saved Comparisons."
     : status === 422

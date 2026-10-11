@@ -4,6 +4,8 @@ import type { SearchPageProps } from "../_lib/contracts";
 import type { SavedComparison } from "../_lib/saved-comparison-contracts";
 import { ApiError, getComparisonPage } from "../_lib/api";
 import { single } from "../_lib/format";
+import { accountState, sessionHeaders } from "../_lib/auth-api";
+import { SignInRequired } from "../_components/sign-in-required";
 import { EmptyState, PageHeading } from "../_components/ui";
 import { ManageComparisons } from "./manage-comparisons";
 import "./comparisons.css";
@@ -28,13 +30,25 @@ export default async function ComparisonsPage({
   const offset = Number(offsetValue);
   const pageHref = (next: number) =>
     `/comparisons?${new URLSearchParams({ ...(year ? { season: year } : {}), offset: String(next) })}`;
+  const account = await accountState();
+  if (account.error)
+    return (
+      <EmptyState title="Account access temporarily unavailable">
+        <p>Your saved selections are unchanged.</p>
+        <a href={pageHref(offset)}>Retry</a>
+      </EmptyState>
+    );
+  if (!account.user) return <SignInRequired next={pageHref(offset)} />;
   let rows: SavedComparison[] = [];
   let unavailable = false;
   try {
-    rows = await getComparisonPage<SavedComparison>({
-      ...(year ? { season: year } : {}),
-      offset,
-    });
+    rows = await getComparisonPage<SavedComparison>(
+      {
+        ...(year ? { season: year } : {}),
+        offset,
+      },
+      await sessionHeaders(),
+    );
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
     unavailable = true;
@@ -46,7 +60,7 @@ export default async function ComparisonsPage({
         intro="Return to recorded lap and strategy selections. Each comparison is recalculated from the data available when you open it."
       />
       <p className="section-note">
-        Saved in this local workspace
+        Your saved comparisons
         {year ? ` · Season ${year}` : " · All seasons"}.{" "}
         {year && (
           <Link href="/comparisons" prefetch={false}>

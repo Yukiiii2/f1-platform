@@ -1,4 +1,4 @@
-"""Local workspace presets; configurations contain IDs/settings, never analysis."""
+"""User-owned presets and preserved legacy IDs/settings, never analysis."""
 
 from uuid import UUID
 
@@ -16,11 +16,22 @@ class SavedComparison(Entity, Base):
             name="supported_type",
         ),
         CheckConstraint("season >= 1950", name="valid_season"),
+        CheckConstraint(
+            "(user_id IS NOT NULL AND owner_id IS NULL) OR "
+            "(user_id IS NULL AND owner_id IS NOT NULL)",
+            name="one_owner",
+        ),
         Index("ix_saved_comparisons_owner_updated", "owner_id", "updated_at", "id"),
         Index("ix_saved_comparisons_owner_season", "owner_id", "season"),
+        Index("ix_saved_comparisons_user_updated", "user_id", "updated_at", "id"),
+        Index("ix_saved_comparisons_user_season", "user_id", "season"),
     )
 
-    owner_id: Mapped[UUID]
+    # Retained only for explicit operator assignment of legacy workspace presets.
+    owner_id: Mapped[UUID | None]
+    user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
     title: Mapped[str] = mapped_column(String(120))
     comparison_type: Mapped[str] = mapped_column(String(30))
     season: Mapped[int]

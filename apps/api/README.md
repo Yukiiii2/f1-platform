@@ -747,7 +747,6 @@ apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test
 apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_gemini.py -v
 ```
 
-
 ### Near-live session updates (V2 Phase 1)
 
 Stop workers before applying `alembic upgrade head`; migration
@@ -816,6 +815,7 @@ Only a successful complete finalization changes the state to `finalized`; missin
 results or provider failures leave it provisional. Race, Telemetry and Strategy
 pages show that state and provide manual refresh. No WebSockets, client polling,
 automatic Pitwall calls, or live strategy intent/replay inference are introduced.
+
 ## Saved Comparisons (V2 Phase 4)
 
 Saved presets contain only versioned application IDs and selector settings, not
@@ -838,14 +838,12 @@ only the presets table, domain foreign keys and owner/date/season indexes. Forei
 keys use `SET NULL` on deletion; original IDs remain in the configuration snapshot.
 Deleting a preset never removes F1 records. No automatic migration runs at startup.
 
-Temporary ownership is a **server-controlled local workspace UUID**, default
+Phase 4 used a **server-controlled local workspace UUID**, default
 `00000000-0000-0000-0000-000000000001`. Deployments can set
 `SAVED_COMPARISONS_OWNER_ID` to another UUID server-side. Requests cannot select
-an owner and all CRUD is scoped to this namespace. This is shared local/single-user
-storage, not multi-user authentication; no account/profile is created. Phase 5
-can add a real user foreign key and explicitly claim/migrate workspace presets
-without replacing their UUIDs or configurations. Changing the workspace value
-isolates a namespace; it does not delete existing presets.
+an owner. Phase 5 replaces this runtime assumption with authenticated user
+ownership. This UUID now identifies preserved legacy presets only; changing it
+does not grant access or delete presets. See the explicit assignment below.
 
 REST contracts:
 
@@ -867,7 +865,87 @@ page's detailed checks. Core season imports alone never imply telemetry exists.
 `/telemetry` or `/strategy` query URL, restoring the original season/event/session
 and exact pair. Those pages recompute through their existing APIs and preserve
 their grounded Pitwall context. The list can filter by season or show all seasons,
-and offers rename and confirmed deletion. There is no replay/authentication change.
+and offers rename and confirmed deletion. Phase 5 requires sign-in for all preset
+CRUD; public analysis and replay remain accessible.
+
+## Accounts and ownership (V2 Phase 5)
+
+Install the updated API dependencies, then migrate and run from the repository root:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m pip install -e "apps/api[dev]"
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+apps/api/.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir apps/api --reload --port 8000
+```
+
+`0010_user_accounts` adds UUID users, hashed opaque sessions, a shared admission
+counter and a user FK/indexes on saved comparisons. It preserves every legacy
+preset's ID and configuration, leaving it unassigned. Exactly one of a real user
+or a legacy workspace must own each row. Downgrade refuses while users exist;
+an explicit data-preservation plan is required before rollback.
+
+No new secret is required. Existing `DATABASE_URL` remains server-side. Optional
+server-only settings in `apps/api/.env` (identical across API replicas):
+
+| Variable                   | Local default                                 | Deployment requirement                     |
+| -------------------------- | --------------------------------------------- | ------------------------------------------ |
+| `AUTH_COOKIE_SECURE`       | `false`                                       | `true` over HTTPS                          |
+| `AUTH_ALLOWED_ORIGINS`     | `http://localhost:3000,http://127.0.0.1:3000` | Exact trusted web origins, comma-separated |
+| `AUTH_SESSION_HOURS`       | `12`                                          | 1–168 hours                                |
+| `AUTH_REQUESTS_PER_MINUTE` | `20`                                          | Aggregate 1–100/minute                     |
+| `AUTH_MAX_CONCURRENT`      | `2`                                           | Aggregate 1–4 password operations          |
+
+REST routes:
+
+- `POST /v1/auth/register`: `{username,password}`; 201 public user + session cookie.
+- `POST /v1/auth/login`: same shape; 200 public user + rotated session cookie.
+- `POST /v1/auth/logout`: 204; revoke current session and clear cookie.
+- `GET /v1/auth/me`: current public user, or 401.
+
+Sign-in names are case-insensitive, 3–32 ASCII letters/numbers/dot/underscore/hyphen,
+starting with a letter/number. New passwords require 12–128 characters. Passwords
+are salted [Argon2id](https://argon2-cffi.readthedocs.io/en/stable/api.html) hashes;
+only SHA-256 hashes of random 256-bit session tokens are stored. Sessions expire,
+rotate on sign-in, are revocable and capped at five per user. HttpOnly, SameSite=Lax
+cookies stay outside client JS. The web forwards only this cookie server-side.
+All private reads/writes scope by authenticated user; other-user IDs return the
+same 404 as nonexistent IDs. Reopening still revalidates the original F1 records.
+
+Unsafe account/preset requests require `X-F1-Auth: 1` and, when supplied, an
+allowlisted Origin. Cross-origin CORS is disabled; Next server actions also enforce
+same-origin writes. Password request bodies are bounded at 2 KiB before JSON
+parsing; validation errors omit input. Database-shared minute and concurrency
+guards fail closed, return 429 with Retry-After, and release locks on failure.
+Pitwall limits are independent and unchanged. Never configure proxies/APM to log
+credential bodies, Cookie or Set-Cookie headers. Deployment requires HTTPS and
+trusted proxy/origin configuration. Aggregate limits are a baseline, not a full
+internet abuse/bot defence. Login errors do not distinguish wrong password from
+missing user; registration conflicts remain generic. Email recovery, OAuth and
+profile features are deliberately out of scope.
+
+Local flow: open `/create-account`, choose a name/password, then save an existing
+Telemetry Lab or Strategy pair. Sign out in the header and sign in at `/sign-in`.
+Public pages remain accessible. Original selections survive the sign-in return URL.
+
+**Legacy assignment is an operator action, never a public claim endpoint.** After
+registering the intended account, resolve its UUID with `/v1/auth/me` while signed
+in. Substitute that UUID and the legacy workspace UUID (default shown above):
+
+```powershell
+$env:PYTHONPATH = "apps/api"
+apps/api/.venv/Scripts/python.exe -m app.accounts --assign-legacy --workspace <WORKSPACE_UUID> --user <USER_UUID>
+# Review the dry-run count; only then perform the explicit assignment:
+apps/api/.venv/Scripts/python.exe -m app.accounts --assign-legacy --workspace <WORKSPACE_UUID> --user <USER_UUID> --apply
+```
+
+Assignment is transactional and repeat-safe, preserves IDs/configuration, and
+cannot reassign already claimed rows. No existing preset is automatically attached
+to the first registrant or discarded. Unassigned presets are invisible to all users.
+
+Focused account checks: `python -m unittest test_v2_auth` from `apps/api/tests`
+using the API virtual environment and repository root in `PYTHONPATH`. Set
+`F1_TEST_POSTGRES=1` for disposable-schema migration/admission checks; no live
+provider calls or application records are changed by these tests.
 
 Focused checks:
 

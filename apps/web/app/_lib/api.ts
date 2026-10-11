@@ -13,6 +13,7 @@ async function request<T>(
   method: "GET" | "POST" | "PATCH" | "DELETE" = body === undefined
     ? "GET"
     : "POST",
+  requestHeaders: Record<string, string> = {},
 ): Promise<T> {
   try {
     const base = (
@@ -26,10 +27,13 @@ async function request<T>(
       cache: "no-store",
       signal: AbortSignal.timeout(timeout),
       method,
+      headers: {
+        ...requestHeaders,
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
       ...(body === undefined
         ? {}
         : {
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           }),
     });
@@ -43,12 +47,23 @@ async function request<T>(
 }
 export function getComparisonPage<T>(
   query: Record<string, string | number> = {},
+  headers: Record<string, string> = {},
 ): Promise<T[]> {
-  return request<T[]>("comparisons", { ...query, limit: 50 });
+  return request<T[]>(
+    "comparisons",
+    { ...query, limit: 50 },
+    undefined,
+    8000,
+    "GET",
+    headers,
+  );
 }
-export function getSavedComparison<T>(id: string): Promise<T> {
+export function getSavedComparison<T>(
+  id: string,
+  headers: Record<string, string> = {},
+): Promise<T> {
   comparisonId(id);
-  return request<T>(`comparisons/${id}`);
+  return request<T>(`comparisons/${id}`, {}, undefined, 8000, "GET", headers);
 }
 function comparisonId(id: string) {
   if (
@@ -60,16 +75,18 @@ export function changeSavedComparison<T>(
   id: string,
   method: "PATCH" | "DELETE",
   body?: unknown,
+  headers: Record<string, string> = {},
 ): Promise<T> {
   comparisonId(id);
-  return request<T>(`comparisons/${id}`, {}, body, 8000, method);
+  return request<T>(`comparisons/${id}`, {}, body, 8000, method, headers);
 }
 export function postEntity<T>(
   path: string,
   body: unknown,
   timeout?: number,
+  headers: Record<string, string> = {},
 ): Promise<T> {
-  return request<T>(path, {}, body, timeout);
+  return request<T>(path, {}, body, timeout, "POST", headers);
 }
 export function getSessionStrategy<T>(sessionId: string): Promise<T> {
   return request<T>(`sessions/${sessionId}/strategy`);

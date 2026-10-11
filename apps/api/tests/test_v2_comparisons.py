@@ -16,7 +16,7 @@ class SavedComparisonTests(unittest.TestCase):
         data["laps"].append({**data["laps"][0], "lap_number": 2})
         fixture.Phase4Tests.import_data(self, data)
         from app import models
-        from app.api.comparisons import workspace_owner
+        from app.api.auth import authenticated_owner
         from app.api.core import database
         from app.main import app
 
@@ -28,9 +28,17 @@ class SavedComparisonTests(unittest.TestCase):
                 yield session
 
         app.dependency_overrides[database] = db
-        app.dependency_overrides[workspace_owner] = lambda: self.owner
+        app.dependency_overrides[authenticated_owner] = lambda: self.owner
         self.addCleanup(app.dependency_overrides.clear)
         with self.factory() as db:
+            db.add(
+                models.User(
+                    id=self.owner,
+                    username="preset-fixture",
+                    password_hash="$argon2id$test-fixture",
+                )
+            )
+            db.commit()
             session = db.get(models.Session, self.session_id)
             event = db.get(models.Event, session.event_id)
             laps = db.scalars(select(models.Lap).order_by(models.Lap.lap_number)).all()
@@ -186,8 +194,11 @@ class SavedComparisonTests(unittest.TestCase):
         table = models.SavedComparison.__table__
         self.assertTrue(table.c.created_at.type.timezone)
         self.assertTrue(table.c.updated_at.type.timezone)
-        self.assertEqual(len(table.foreign_keys), 7)
-        self.assertTrue(all(key.ondelete == "SET NULL" for key in table.foreign_keys))
+        domain_keys = [
+            key for key in table.foreign_keys if key.parent.name != "user_id"
+        ]
+        self.assertEqual(len(domain_keys), 7)
+        self.assertTrue(all(key.ondelete == "SET NULL" for key in domain_keys))
 
     def test_real_but_wrong_driver_session_and_mixed_sources_are_rejected(self):
         from app import models

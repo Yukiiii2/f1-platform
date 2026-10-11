@@ -26,6 +26,7 @@ import {
 import { CompareForm } from "./compare-form";
 import { ComparisonView } from "./comparison-view";
 import { SaveComparison } from "../_components/save-comparison";
+import { accountState } from "../_lib/auth-api";
 import { telemetryPreset } from "../_lib/saved-comparisons";
 import "./telemetry.css";
 
@@ -33,6 +34,13 @@ export const metadata: Metadata = { title: "Telemetry Lab" };
 
 export default async function TelemetryPage({ searchParams }: SearchPageProps) {
   const query = await searchParams;
+  const account = await accountState();
+  const returnTo = `/telemetry?${new URLSearchParams(
+    Object.entries(query).flatMap(([key, value]) => {
+      const item = single(value);
+      return item === undefined ? [] : [[key, item]];
+    }),
+  )}`;
   const selected = Object.fromEntries(
     Object.entries(query).map(([key, value]) => [key, single(value)]),
   );
@@ -243,6 +251,9 @@ export default async function TelemetryPage({ searchParams }: SearchPageProps) {
               <SaveComparison
                 key={JSON.stringify(preset)}
                 preset={preset}
+                signedIn={!!account.user}
+                authUnavailable={!!account.error}
+                returnTo={returnTo}
                 suggestedTitle={`${season.year} ${event!.name} · Laps ${chosenLaps[0].lap_number} / ${chosenLaps[1].lap_number}`}
               />
             )}

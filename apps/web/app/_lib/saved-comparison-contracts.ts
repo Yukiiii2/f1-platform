@@ -42,4 +42,4 @@ export type SavedComparison = {
 };
 export type SaveResult =
   | { response: SavedComparison; error?: never }
-  | { response?: never; error: string };
+  | { response?: never; error: string; signInRequired?: true };

@@ -1,4 +1,4 @@
-"""Local single-workspace CRUD. Ownership is server-controlled, not authentication."""
+"""Private user presets; legacy workspace rows require explicit operator assignment."""
 
 from typing import Annotated
 from uuid import UUID
@@ -9,30 +9,30 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app import models
+from app.api.auth import authenticated_owner
 from app.api.core import Database, Limit, Offset, Year
-from app.core.config import get_settings
 from app.schemas.comparisons import ComparisonCreate, ComparisonRead, ComparisonUpdate
 from app.services.comparisons import InvalidComparison, apply_configuration, read_many
 
 router = APIRouter(prefix="/comparisons", tags=["saved comparisons"])
 
 
-def workspace_owner() -> UUID:
-    return get_settings().saved_comparisons_owner_id
-
-
-Owner = Annotated[UUID, Depends(workspace_owner)]
+Owner = Annotated[UUID, Depends(authenticated_owner)]
 
 
 def owned(db, identifier, owner):
     row = db.scalar(
         select(models.SavedComparison).where(
             models.SavedComparison.id == identifier,
-            models.SavedComparison.owner_id == owner,
+            models.SavedComparison.user_id == owner,
         )
     )
     if row is None:
-        raise HTTPException(status_code=404, detail="Saved comparison not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Saved comparison not found",
+            headers={"Cache-Control": "no-store"},
+        )
     return row
 
 
@@ -53,7 +53,7 @@ def persist(db, row):
 @router.post("", response_model=ComparisonRead, status_code=201)
 def create(db: Database, owner: Owner, request: ComparisonCreate):
     row = models.SavedComparison(
-        owner_id=owner, title=request.title, comparison_type=request.comparison_type
+        user_id=owner, title=request.title, comparison_type=request.comparison_type
     )
     try:
         apply_configuration(db, row, request)
@@ -71,7 +71,7 @@ def listing(
     offset: Offset = 0,
 ):
     query = select(models.SavedComparison).where(
-        models.SavedComparison.owner_id == owner
+        models.SavedComparison.user_id == owner
     )
     if season is not None:
         query = query.where(models.SavedComparison.season == season)

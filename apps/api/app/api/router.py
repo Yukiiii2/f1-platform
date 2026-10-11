@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.ai import router as ai_router
+from app.api.auth import router as auth_router
 from app.api.comparisons import router as comparisons_router
 from app.api.core import router as core_router
 from app.api.replay import router as replay_router
@@ -17,6 +18,7 @@ router.include_router(telemetry_router)
 router.include_router(strategy_router)
 router.include_router(ai_router)
 router.include_router(comparisons_router)
+router.include_router(auth_router)
 
 
 class HealthResponse(BaseModel):
