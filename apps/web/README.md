@@ -50,8 +50,8 @@ API. Apply backend migration `0010_user_accounts` first; see the
 No frontend credential/secret variable is needed. Never use `NEXT_PUBLIC_*` for
 passwords, API keys or session tokens.
 
-Visit `/create-account` to register or `/sign-in` to log in. The header shows the
-sign-in name and Sign out. Authentication uses server actions and HttpOnly cookies;
+Visit `/create-account` to register or `/sign-in` to log in. The header shows an
+Account link with the sign-in name and Sign out. Authentication uses server actions and HttpOnly cookies;
 no password/token is stored in browser local storage. `/comparisons` lists only the
 signed-in user's presets; existing Open, Rename and confirmed Delete remain.
 Logged-out save actions link to sign-in with the exact season/event/session,
@@ -65,8 +65,25 @@ assignment and are never automatically given to a new registrant.
 Focused checks from repository root:
 
 ```powershell
-node --experimental-strip-types --test apps/web/tests/auth.test.mjs apps/web/tests/comparisons.test.mjs
+node --experimental-strip-types --test apps/web/tests/account.test.mjs apps/web/tests/auth.test.mjs apps/web/tests/comparisons.test.mjs
 ```
+
+### Account settings (V2 Phase 6)
+
+`/account` shows your sign-in name, creation date, own saved-comparison count and
+active-session creation/expiry timestamps in UTC. It offers name/password changes,
+signing out other sessions and account deletion. Password changes require the
+current password and matching new-password confirmation; the server refreshes the
+current HttpOnly session and revokes others. Deletion requires the current password
+and typing `DELETE`, and permanently removes only your account and saved presets.
+Public race data remains available. There is no additional schema/configuration.
+
+Forms display inline pending, validation, failure and success states. Failed
+requests keep entered values for correction; expired sessions offer sign-in again.
+Account navigation and sign-in return URLs retain valid season context. Session
+tokens, password hashes and credentials never appear in rendered metadata or
+browser storage. Manual review should include mobile layout, keyboard/focus
+behavior and password-change cookie refresh across two browser sessions.
 
 ## First 3D feature (Phase 10 prompt)
 

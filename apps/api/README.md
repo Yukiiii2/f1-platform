@@ -921,7 +921,7 @@ credential bodies, Cookie or Set-Cookie headers. Deployment requires HTTPS and
 trusted proxy/origin configuration. Aggregate limits are a baseline, not a full
 internet abuse/bot defence. Login errors do not distinguish wrong password from
 missing user; registration conflicts remain generic. Email recovery, OAuth and
-profile features are deliberately out of scope.
+social profile features are deliberately out of scope.
 
 Local flow: open `/create-account`, choose a name/password, then save an existing
 Telemetry Lab or Strategy pair. Sign out in the header and sign in at `/sign-in`.
@@ -946,6 +946,43 @@ Focused account checks: `python -m unittest test_v2_auth` from `apps/api/tests`
 using the API virtual environment and repository root in `PYTHONPATH`. Set
 `F1_TEST_POSTGRES=1` for disposable-schema migration/admission checks; no live
 provider calls or application records are changed by these tests.
+
+## Account settings (V2 Phase 6)
+
+The existing user/session tables and migration `0010_user_accounts` also support
+account settings. No new migration, dependency or environment variable is required.
+The frontend exposes these at `/account` after sign-in.
+
+- `GET /v1/auth/account`: current public user, own saved-comparison count and
+  active sessions with `created_at`, `expires_at` and `is_current` only.
+- `PATCH /v1/auth/username`: `{username}`; same registration validation and
+  case-insensitive uniqueness. Returns the updated user; keeps the current session.
+  Invalid names return 422, conflicts return 409.
+- `POST /v1/auth/password`: `{current_password,new_password}`; 204. Requires the
+  current password and a new 12–128-character password. Uses existing Argon2id
+  hashing, revokes all old sessions and issues a fresh HttpOnly current cookie.
+- `POST /v1/auth/sessions/revoke-others`: 204. Keeps this session and revokes the
+  current user's other sessions.
+- `DELETE /v1/auth/account`: `{current_password,confirmation:"DELETE"}`; 204.
+  Permanently removes only the signed-in user's saved comparisons, sessions and
+  account, then clears the cookie. Shared F1 records and unassigned legacy presets
+  remain untouched. This action cannot be undone.
+
+These routes accept no target user ID. Missing/expired authentication returns 401;
+an incorrect current password returns 400. Settings mutations use the existing
+CSRF, aggregate minute/concurrency and sanitized-validation protections. Credential
+bodies remain bounded at 2 KiB. Account responses are not cached. Session tokens
+and password hashes never appear in account metadata. Per-user row locks serialize
+login, logout and settings writes; sessions/passwords are rechecked after waiting
+for a lock, so revocation and password changes cannot revive stale authorization.
+
+Focused checks from repository root (PostgreSQL checks use disposable schemas):
+
+```powershell
+$env:PYTHONPATH = "apps/api;apps/api/tests"
+$env:F1_TEST_POSTGRES = "1"
+apps/api/.venv/Scripts/python.exe -m unittest test_v2_account test_v2_auth test_v2_comparisons
+```
 
 Focused checks:
 

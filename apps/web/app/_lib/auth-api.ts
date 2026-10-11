@@ -17,15 +17,28 @@ export async function sessionHeaders(): Promise<Record<string, string>> {
   };
 }
 export async function authFetch(
-  path: "auth/login" | "auth/register" | "auth/logout" | "auth/me",
-  body?: { username: string; password: string },
+  path:
+    | "auth/login"
+    | "auth/register"
+    | "auth/logout"
+    | "auth/me"
+    | "auth/account"
+    | "auth/username"
+    | "auth/password"
+    | "auth/sessions/revoke-others",
+  body?: Record<string, string>,
+  method: "GET" | "POST" | "PATCH" | "DELETE" = (path === "auth/me" ||
+    path === "auth/account") &&
+  body === undefined
+    ? "GET"
+    : "POST",
 ): Promise<Response> {
   try {
     const base = (
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
     ).replace(/\/$/, "");
     const response = await fetch(`${base}/v1/${path}`, {
-      method: path === "auth/me" ? "GET" : "POST",
+      method,
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
       headers: {

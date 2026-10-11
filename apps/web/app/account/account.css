@@ -1,0 +1,50 @@
+.account-settings {
+  max-width: 46rem;
+  margin-bottom: 4rem;
+}
+.account-summary {
+  display: grid;
+  gap: 1rem;
+}
+.account-summary div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) 2fr;
+  gap: 1rem;
+}
+.account-summary dt {
+  color: var(--muted);
+}
+.account-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.account-section {
+  border-top: 1px solid var(--border);
+  padding-block: 2rem;
+}
+.account-section h2 {
+  margin-top: 0;
+}
+.account-section .account-form {
+  max-width: 30rem;
+}
+.account-section details .account-form {
+  margin-top: 1.5rem;
+}
+.account-session-list {
+  list-style: none;
+  padding: 0;
+}
+.account-session-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding-block: 0.75rem;
+}
+@media (max-width: 600px) {
+  .account-summary div {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}

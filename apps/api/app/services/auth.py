@@ -82,3 +82,19 @@ def session_user(db, token):
             models.AuthSession.expires_at > datetime.now(timezone.utc),
         )
     )
+
+
+def locked_session_user(db, token):
+    """Serialize account writes and recheck a session after any lock wait."""
+    user = session_user(db, token)
+    if user is None:
+        return None
+    locked = db.scalar(
+        select(models.User)
+        .where(models.User.id == user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if locked is None or session_user(db, token) is None:
+        return None
+    return locked

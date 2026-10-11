@@ -11,6 +11,9 @@ class AccountBodyLimit:
         if scope["type"] != "http" or scope["path"] not in {
             "/v1/auth/login",
             "/v1/auth/register",
+            "/v1/auth/username",
+            "/v1/auth/password",
+            "/v1/auth/account",
         }:
             return await self.app(scope, receive, send)
         body = bytearray()

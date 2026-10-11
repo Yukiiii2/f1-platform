@@ -14,7 +14,12 @@ export function AccountControls({ user, error }: AccountState) {
     <div className="account-controls" aria-label="Account">
       {user ? (
         <>
-          <span>Signed in as {user.username}</span>
+          <Link
+            href={`/account${/^\d{4}$/.test(query.get("season") ?? "") ? `?season=${query.get("season")}` : ""}`}
+            prefetch={false}
+          >
+            Account · {user.username}
+          </Link>
           <button
             type="button"
             disabled={pending}

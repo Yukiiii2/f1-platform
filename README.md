@@ -20,6 +20,10 @@ analysis is recalculated from current recorded data. Apply migration
 `0010_user_accounts` before using it (`apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head`). Public race data needs no account.
 Existing workspace presets are preserved for explicit operator assignment. See
 [account setup and ownership notes](apps/api/README.md#accounts-and-ownership-v2-phase-5).
+V2 Phase 6 adds `/account`: change your sign-in name/password, inspect active
+sessions, sign out other sessions, or explicitly delete your account and private
+presets. Public F1 data is preserved. No additional migration or configuration is
+required; see [account settings](apps/api/README.md#account-settings-v2-phase-6).
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,
 the Telemetry Lab at `/telemetry`, completed-race Strategy + Tyres at `/strategy`,
