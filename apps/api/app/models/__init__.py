@@ -1,4 +1,5 @@
 from app.db.base import Base
+from app.models.comparisons import SavedComparison
 from app.models.core_sources import CoreSourceRevision, CoreSourceState
 from app.models.domain import (
     Circuit,
@@ -28,6 +29,7 @@ from app.models.telemetry import (
 from app.models.updates import SessionUpdateJob
 
 __all__ = [
+    "SavedComparison",
     "CoreSourceRevision",
     "CoreSourceState",
     "Base",

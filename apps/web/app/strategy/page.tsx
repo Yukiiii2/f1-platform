@@ -23,6 +23,8 @@ import {
   SeasonSelector,
 } from "../_components/ui";
 import { StrategyView } from "./strategy-view";
+import { SaveComparison } from "../_components/save-comparison";
+import { strategyPreset } from "../_lib/saved-comparisons";
 import "./strategy.css";
 
 export const metadata: Metadata = { title: "Strategy + Tyres" };
@@ -70,6 +72,13 @@ export default async function StrategyPage({ searchParams }: SearchPageProps) {
     a: single(query.a),
     b: single(query.b),
   });
+  const preset =
+    event && race && season && strategy && selected
+      ? strategyPreset(
+          { season: season.year, event_id: event.id, session_id: race.id },
+          selected,
+        )
+      : null;
   return (
     <>
       <PageHeading
@@ -226,11 +235,20 @@ export default async function StrategyPage({ searchParams }: SearchPageProps) {
                   </p>
                 </EmptyState>
               ) : (
-                <StrategyView
-                  strategy={strategy}
-                  selected={selected}
-                  drivers={drivers}
-                />
+                <>
+                  {preset && (
+                    <SaveComparison
+                      key={JSON.stringify(preset)}
+                      preset={preset}
+                      suggestedTitle={`${season.year} ${event.name} · ${selected.map((row) => driverName(drivers.get(row.driver_id)!)).join(" / ")}`}
+                    />
+                  )}
+                  <StrategyView
+                    strategy={strategy}
+                    selected={selected}
+                    drivers={drivers}
+                  />
+                </>
               )}
             </>
           )}

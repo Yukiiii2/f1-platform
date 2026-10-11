@@ -736,3 +736,23 @@ tbody th a:hover {
     transition: none !important;
   }
 }
+.save-comparison {
+  margin: 1.5rem 0;
+}
+.save-comparison summary {
+  cursor: pointer;
+  width: fit-content;
+  padding: 0.65rem 0;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.save-comparison[open] summary {
+  margin-bottom: 0.75rem;
+}
+.save-comparison .field {
+  min-width: 0;
+  flex: 0 1 28rem;
+}
+.save-comparison input {
+  width: 100%;
+}

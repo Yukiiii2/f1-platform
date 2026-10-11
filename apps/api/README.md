@@ -816,3 +816,62 @@ Only a successful complete finalization changes the state to `finalized`; missin
 results or provider failures leave it provisional. Race, Telemetry and Strategy
 pages show that state and provide manual refresh. No WebSockets, client polling,
 automatic Pitwall calls, or live strategy intent/replay inference are introduced.
+## Saved Comparisons (V2 Phase 4)
+
+Saved presets contain only versioned application IDs and selector settings, not
+telemetry copies, calculations or AI answers. Supported types are `telemetry_laps`
+and `strategy_tyres`: current driver/race profiles have no independent reusable
+comparison state. Telemetry retains both lap/driver IDs, alignment and explicit
+approximate-window opt-in; the existing UI's 201-point sampling stays unchanged.
+Strategy retains both recorded driver/source selectors. Existing analysis APIs
+remain authoritative for channel gaps, tyre age, pace and provenance.
+
+From the repository root, with the existing database configured:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m alembic -c apps/api/alembic.ini upgrade head
+apps/api/.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir apps/api --reload --port 8000
+```
+
+Migration `0009_saved_comparisons` follows `0008_historical_core_sources`. It adds
+only the presets table, domain foreign keys and owner/date/season indexes. Foreign
+keys use `SET NULL` on deletion; original IDs remain in the configuration snapshot.
+Deleting a preset never removes F1 records. No automatic migration runs at startup.
+
+Temporary ownership is a **server-controlled local workspace UUID**, default
+`00000000-0000-0000-0000-000000000001`. Deployments can set
+`SAVED_COMPARISONS_OWNER_ID` to another UUID server-side. Requests cannot select
+an owner and all CRUD is scoped to this namespace. This is shared local/single-user
+storage, not multi-user authentication; no account/profile is created. Phase 5
+can add a real user foreign key and explicitly claim/migrate workspace presets
+without replacing their UUIDs or configurations. Changing the workspace value
+isolates a namespace; it does not delete existing presets.
+
+REST contracts:
+
+- `POST /v1/comparisons`: `{title, comparison_type, configuration}` (201).
+- `GET /v1/comparisons?season=2025&limit=50&offset=0`: bounded list (max 200).
+- `GET /v1/comparisons/{uuid}`: current context, safe notices and reopening URL.
+- `PATCH /v1/comparisons/{uuid}`: nonempty title and/or same-type configuration.
+- `DELETE /v1/comparisons/{uuid}`: remove preset (204).
+
+Writes reject malformed IDs, unknown settings/types, cross-season/session/lap
+references and unrecorded strategy selectors. Reads batch identity resolution and
+recheck records. Missing records or unsupported stored versions return an explicit
+`unavailable` preset with no reopening URL; no replacement is selected. Partial
+timing/confirmed channel coverage and provisional sessions remain labelled.
+Strategy coverage is conservatively marked partial pending the existing strategy
+page's detailed checks. Core season imports alone never imply telemetry exists.
+
+`/comparisons/{uuid}/open` revalidates with the backend and redirects to the existing
+`/telemetry` or `/strategy` query URL, restoring the original season/event/session
+and exact pair. Those pages recompute through their existing APIs and preserve
+their grounded Pitwall context. The list can filter by season or show all seasons,
+and offers rename and confirmed deletion. There is no replay/authentication change.
+
+Focused checks:
+
+```powershell
+apps/api/.venv/Scripts/python.exe -m unittest discover -s apps/api/tests -p test_v2_comparisons.py
+node --experimental-strip-types --test apps/web/tests/comparisons.test.mjs
+```

@@ -343,6 +343,7 @@ class PostgresHistoryTests(unittest.TestCase):
                     connection, opts={"target_metadata": models.Base.metadata}
                 )
                 with Operations.context(context):
+                    migrations = []
                     for path in sorted(
                         (Path(__file__).parents[1] / "migrations/versions").glob("*.py")
                     ):
@@ -350,6 +351,7 @@ class PostgresHistoryTests(unittest.TestCase):
                         migration = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(migration)
                         migration.upgrade()
+                        migrations.append(migration)
                     self.assertEqual(
                         compare_metadata(context, models.Base.metadata), []
                     )
@@ -361,8 +363,11 @@ class PostgresHistoryTests(unittest.TestCase):
                     connection, opts={"target_metadata": models.Base.metadata}
                 )
                 with Operations.context(context):
-                    migration.downgrade()
-                    migration.upgrade()
+                    # Exercise the observation backfill, including newer dependants.
+                    for migration in reversed(migrations[7:]):
+                        migration.downgrade()
+                    for migration in migrations[7:]:
+                        migration.upgrade()
                 self.assertEqual(compare_metadata(context, models.Base.metadata), [])
             with factory() as db:
                 self.assertEqual(

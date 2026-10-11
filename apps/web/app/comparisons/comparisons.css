@@ -1,0 +1,41 @@
+.saved-comparison-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.saved-comparison-row {
+  border-bottom: 1px solid var(--border);
+  padding: 2rem 0;
+}
+.saved-comparison-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+}
+.saved-comparison-heading h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.saved-comparison-dates {
+  font-size: 0.85rem;
+}
+.saved-comparison-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+.saved-comparison-edit,
+.saved-comparison-delete {
+  margin-top: 1.5rem;
+}
+.saved-comparison-row .field {
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+.saved-comparison-row input {
+  width: 100%;
+}

@@ -13,6 +13,11 @@ An unofficial Formula 1 data, telemetry, strategy, 3D, and AI analysis platform.
 
 V1 Phase 0-12 foundation with V2 near-live session updates and historical seasons.
 Web and API run independently.
+V2 Phase 4 adds local Saved Comparisons at `/comparisons`. Save an existing
+Telemetry Lab lap pair or Strategy driver pair and reopen the same selections;
+analysis is recalculated from current recorded data. Apply migration
+`0009_saved_comparisons` before using it. See
+[saved-comparison storage, ownership and API notes](apps/api/README.md#saved-comparisons-v2-phase-4).
 Jolpica core data can be imported into PostgreSQL through an explicit local job.
 The web provides Home, Races, Race detail, Drivers, Driver detail, Standings,
 the Telemetry Lab at `/telemetry`, completed-race Strategy + Tyres at `/strategy`,

@@ -25,6 +25,8 @@ import {
 } from "../_components/ui";
 import { CompareForm } from "./compare-form";
 import { ComparisonView } from "./comparison-view";
+import { SaveComparison } from "../_components/save-comparison";
+import { telemetryPreset } from "../_lib/saved-comparisons";
 import "./telemetry.css";
 
 export const metadata: Metadata = { title: "Telemetry Lab" };
@@ -79,6 +81,14 @@ export default async function TelemetryPage({ searchParams }: SearchPageProps) {
         laps.find((row) => row.id === id)!,
       )
     : [];
+  const preset =
+    event && session && season && comparison && selectedComparison
+      ? telemetryPreset(
+          { season: season.year, event_id: event.id, session_id: session.id },
+          chosenLaps,
+          selectedComparison,
+        )
+      : null;
   return (
     <>
       <PageHeading
@@ -229,6 +239,13 @@ export default async function TelemetryPage({ searchParams }: SearchPageProps) {
             </section>
           )}
           <section id="comparison" aria-label="Lap comparison result">
+            {preset && (
+              <SaveComparison
+                key={JSON.stringify(preset)}
+                preset={preset}
+                suggestedTitle={`${season.year} ${event!.name} · Laps ${chosenLaps[0].lap_number} / ${chosenLaps[1].lap_number}`}
+              />
+            )}
             {error ? (
               <div className="empty-state" role="alert">
                 <h2>Comparison unavailable</h2>

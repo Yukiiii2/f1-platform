@@ -10,6 +10,9 @@ async function request<T>(
   query: Record<string, string | number> = {},
   body?: unknown,
   timeout = 8000,
+  method: "GET" | "POST" | "PATCH" | "DELETE" = body === undefined
+    ? "GET"
+    : "POST",
 ): Promise<T> {
   try {
     const base = (
@@ -22,20 +25,44 @@ async function request<T>(
     const response = await fetch(url, {
       cache: "no-store",
       signal: AbortSignal.timeout(timeout),
+      method,
       ...(body === undefined
         ? {}
         : {
-            method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           }),
     });
     if (!response.ok) throw new ApiError(response.status);
+    if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError();
   }
+}
+export function getComparisonPage<T>(
+  query: Record<string, string | number> = {},
+): Promise<T[]> {
+  return request<T[]>("comparisons", { ...query, limit: 50 });
+}
+export function getSavedComparison<T>(id: string): Promise<T> {
+  comparisonId(id);
+  return request<T>(`comparisons/${id}`);
+}
+function comparisonId(id: string) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  )
+    throw new ApiError(404);
+}
+export function changeSavedComparison<T>(
+  id: string,
+  method: "PATCH" | "DELETE",
+  body?: unknown,
+): Promise<T> {
+  comparisonId(id);
+  return request<T>(`comparisons/${id}`, {}, body, 8000, method);
 }
 export function postEntity<T>(
   path: string,

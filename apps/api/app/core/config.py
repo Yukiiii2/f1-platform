@@ -2,6 +2,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
 from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
     openf1_username: SecretStr | None = Field(default=None, repr=False)
     openf1_password: SecretStr | None = Field(default=None, repr=False)
     session_live_poll_seconds: int = Field(default=60, ge=60, le=300)
+    saved_comparisons_owner_id: UUID = UUID("00000000-0000-0000-0000-000000000001")
     openai_api_key: SecretStr | None = Field(default=None, repr=False)
     gemini_api_key: SecretStr | None = Field(default=None, repr=False)
     pitwall_provider: Literal["openai", "gemini"] = "openai"

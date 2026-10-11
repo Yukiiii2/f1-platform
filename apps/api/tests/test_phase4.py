@@ -569,6 +569,7 @@ class Phase4Tests(unittest.TestCase):
             "0006_telemetry_observation_order.py",
             "0007_near_live_updates.py",
             "0008_historical_core_sources.py",
+            "0009_saved_comparisons.py",
         ):
             path = Path(__file__).parents[1] / "migrations/versions" / filename
             spec = importlib.util.spec_from_file_location(filename, path)
